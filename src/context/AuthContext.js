@@ -34,8 +34,19 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   };
 
+  // Exposed so screens can force a role re-fetch after updating the users table
+  // without relying on an auth state change event firing.
+  const refetchRole = async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) await fetchRole(currentUser.id);
+  };
+
+  // Sets role to null in memory so RootNavigator shows RoleSelectionScreen.
+  // Does not touch the database — RoleSelectionScreen will upsert the new choice.
+  const clearRole = () => setRole(null);
+
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ user, role, loading, refetchRole, clearRole }}>
       {children}
     </AuthContext.Provider>
   );
