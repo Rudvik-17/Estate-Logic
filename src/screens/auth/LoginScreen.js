@@ -38,26 +38,6 @@ export default function LoginScreen({ navigation }) {
     // On success, AuthContext updates and RootNavigator handles navigation
   };
 
-  const handleCreateAccount = async () => {
-    setError(null);
-    if (!email || !password) {
-      setError('Please enter an email and password to create an account.');
-      return;
-    }
-    setLoading(true);
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
-    setLoading(false);
-    if (signUpError) {
-      setError(signUpError.message);
-      return;
-    }
-    if (data?.user) {
-      // Insert user row so role can be set
-      await supabase.from('users').upsert({ id: data.user.id, role: 'tenant' });
-      navigation.navigate('RoleSelection');
-    }
-  };
-
   const handleForgotPassword = async () => {
     if (!email) {
       Alert.alert('Enter your email', 'Type your email address above, then tap "Forgot credentials?"');
@@ -144,7 +124,7 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           {/* Create account */}
-          <TouchableOpacity style={styles.textLinkBtn} onPress={handleCreateAccount} disabled={loading}>
+          <TouchableOpacity style={styles.textLinkBtn} onPress={() => navigation.navigate('SignUp')} disabled={loading}>
             <Text style={styles.textLink}>Create Account</Text>
           </TouchableOpacity>
 

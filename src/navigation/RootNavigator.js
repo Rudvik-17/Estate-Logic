@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { colors } from '../theme/colors';
 
 import LoginScreen from '../screens/auth/LoginScreen';
+import SignUpScreen from '../screens/auth/SignUpScreen';
 import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import OwnerNavigator from './OwnerNavigator';
 import TenantNavigator from './TenantNavigator';
@@ -27,8 +28,11 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
-          // Not logged in
-          <Stack.Screen name="Login" component={LoginScreen} />
+          // Not logged in — both auth screens in stack
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+          </>
         ) : !role ? (
           // Logged in but no role set yet — always show role picker
           <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />

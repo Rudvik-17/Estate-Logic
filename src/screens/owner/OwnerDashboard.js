@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
   ScrollView,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -18,9 +18,9 @@ import { fonts } from '../../theme/typography';
 import MetricCard from '../../components/MetricCard';
 import SectionHeader from '../../components/SectionHeader';
 import ScreenHeader from '../../components/ScreenHeader';
-import StatusChip from '../../components/StatusChip';
+import PrimaryButton from '../../components/PrimaryButton';
 
-export default function OwnerDashboard() {
+export default function OwnerDashboard({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
@@ -34,6 +34,7 @@ export default function OwnerDashboard() {
   const fetchData = useCallback(async () => {
     if (!user) return;
     setError(null);
+    setLoading(true);
 
     // Fetch properties first to get IDs for subsequent queries
     const propsRes = await supabase
@@ -105,7 +106,7 @@ export default function OwnerDashboard() {
     setRefreshing(false);
   }, [user?.id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
   if (!user) return null;
 
@@ -142,6 +143,38 @@ export default function OwnerDashboard() {
     );
   }
 
+  // ── Empty state — shown instead of metrics/transactions when no properties ────
+  if (properties.length === 0) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader showBell />
+        <ScrollView
+          contentContainerStyle={styles.emptyScrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        >
+          <View style={styles.emptyHero}>
+            <View style={styles.emptyIconCircle}>
+              <MaterialIcons name="domain-add" size={48} color={colors.onPrimary} />
+            </View>
+            <Text style={styles.emptyTitle}>No properties yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Add your first property to get started
+            </Text>
+            <View style={styles.emptyBtnWrapper}>
+              <PrimaryButton
+                label="Add Your First Property"
+                onPress={() => navigation.navigate('AddProperty')}
+                icon="add"
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Dashboard with data ───────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader showBell />
@@ -251,6 +284,15 @@ export default function OwnerDashboard() {
           )}
         </View>
       </ScrollView>
+
+      {/* FAB — Add Property */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 16 }]}
+        onPress={() => navigation.navigate('AddProperty')}
+        activeOpacity={0.85}
+      >
+        <MaterialIcons name="add" size={26} color={colors.onPrimary} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -414,5 +456,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.onPrimary,
     letterSpacing: 0.5,
+  },
+
+  // ── Empty state ───────────────────────────────────────────────────────────────
+  emptyScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyHero: {
+    alignItems: 'center',
+  },
+  emptyIconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyTitle: {
+    fontFamily: fonts.manropeBold,
+    fontSize: 22,
+    color: colors.onSurface,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontFamily: fonts.interRegular,
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  emptyBtnWrapper: {
+    width: '100%',
+  },
+
+  // ── FAB ───────────────────────────────────────────────────────────────────────
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
 });

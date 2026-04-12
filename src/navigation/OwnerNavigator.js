@@ -6,6 +6,7 @@ import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
+import AddPropertyScreen from '../screens/owner/AddPropertyScreen';
 import ResidentDataScreen from '../screens/owner/ResidentDataScreen';
 import TenantOnboardingScreen from '../screens/owner/TenantOnboardingScreen';
 import FinanceOverviewScreen from '../screens/owner/FinanceOverviewScreen';
@@ -22,6 +23,7 @@ function PortfolioStackNav() {
   return (
     <PortfolioStack.Navigator screenOptions={{ headerShown: false }}>
       <PortfolioStack.Screen name="OwnerDashboard" component={OwnerDashboard} />
+      <PortfolioStack.Screen name="AddProperty" component={AddPropertyScreen} />
     </PortfolioStack.Navigator>
   );
 }
