@@ -38,31 +38,63 @@ export default function RoleSelectionScreen() {
   const { user, refetchRole } = useAuth();
   const [loading, setLoading] = useState(null); // 'owner' | 'tenant' | null
   const [error, setError] = useState(null);
+  const [noLinkedTenant, setNoLinkedTenant] = useState(false);
 
   const handleSelect = async (roleKey) => {
     setError(null);
     setLoading(roleKey);
-    console.log('[RoleSelection] upsert start — user:', user?.id, 'role:', roleKey);
+
+    // For tenant role: verify auto-linking already connected this auth account
+    // to a tenant row the owner pre-created. If not, don't commit the role —
+    // show an informational message instead.
+    if (roleKey === 'tenant') {
+      const { data } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+      if (!data?.[0]) {
+        setLoading(null);
+        setNoLinkedTenant(true);
+        return;
+      }
+    }
 
     const { error: upsertError } = await supabase
       .from('users')
       .upsert({ id: user.id, role: roleKey }, { onConflict: 'id' });
 
     if (upsertError) {
-      console.log('[RoleSelection] upsert error:', upsertError.message, upsertError.code);
       setLoading(null);
       setError('Could not save your role: ' + upsertError.message);
       return;
     }
 
-    console.log('[RoleSelection] upsert succeeded, refetching role...');
-    // Call refetchRole directly — more reliable than hoping refreshSession()
-    // triggers an onAuthStateChange event in time.
     await refetchRole();
-    console.log('[RoleSelection] refetchRole complete');
     setLoading(null);
     // RootNavigator will re-render automatically once role changes in AuthContext
   };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    // AuthContext clears user → RootNavigator shows Login
+  };
+
+  // ── No property linked ────────────────────────────────────────────────────────
+  if (noLinkedTenant) {
+    return (
+      <View style={[styles.container, styles.noLinkContainer, { paddingBottom: insets.bottom + 32, paddingTop: insets.top + 40 }]}>
+        <View style={styles.noLinkIconCircle}>
+          <MaterialIcons name="home" size={44} color={colors.outline} />
+        </View>
+        <Text style={styles.noLinkTitle}>No property linked yet</Text>
+        <Text style={styles.noLinkBody}>
+          Your property owner needs to add you as a resident first. Contact your owner to get started — they'll add your email to the residents list.
+        </Text>
+        <PrimaryButton label="Sign Out" onPress={handleSignOut} icon="logout" />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -241,5 +273,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 18,
+  },
+
+  // ── No linked tenant ──────────────────────────────────────────────────────────
+  noLinkContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  noLinkIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  noLinkTitle: {
+    fontFamily: fonts.manropeBold,
+    fontSize: 22,
+    color: colors.onSurface,
+    textAlign: 'center',
+  },
+  noLinkBody: {
+    fontFamily: fonts.interRegular,
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
   },
 });

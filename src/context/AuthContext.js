@@ -15,14 +15,42 @@ export const AuthProvider = ({ children }) => {
       else setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) fetchRole(session.user.id);
-      else { setRole(null); setLoading(false); }
+      if (session?.user) {
+        // On sign-in or initial session restore, silently link any unlinked
+        // tenant row whose email matches this user's auth email.
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          linkTenantIfNeeded(session.user);
+        }
+        fetchRole(session.user.id);
+      } else {
+        setRole(null);
+        setLoading(false);
+      }
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // Silently link an unlinked tenant row to this auth user if emails match.
+  // This runs on every sign-in so the first time a tenant authenticates their
+  // account gets connected to the row the owner pre-created.
+  const linkTenantIfNeeded = async (authUser) => {
+    if (!authUser?.email) return;
+    const { data } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('email', authUser.email)
+      .is('user_id', null)
+      .limit(1);
+    if (data?.[0]) {
+      await supabase
+        .from('tenants')
+        .update({ user_id: authUser.id, status: 'active' })
+        .eq('id', data[0].id);
+    }
+  };
 
   const fetchRole = async (userId) => {
     const { data } = await supabase

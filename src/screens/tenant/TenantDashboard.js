@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ export default function TenantDashboard({ navigation }) {
   const fetchData = useCallback(async () => {
     if (!user) return;
     setError(null);
+    setLoading(true);
 
     // Use limit(1) + array access instead of .single() to handle both
     // zero-row and multi-row cases without throwing a Supabase error.
@@ -43,10 +45,18 @@ export default function TenantDashboard({ navigation }) {
       .eq('user_id', user.id)
       .limit(1);
 
+    if (tErr) {
+      setError(tErr.message);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     const tenantData = tenantRows?.[0] ?? null;
 
-    if (tErr || !tenantData) {
-      setError(tErr?.message ?? 'No active lease found for your account.');
+    if (!tenantData) {
+      // No linked tenant row yet — not a network error, just not set up
+      setTenantProfile(null);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -85,7 +95,7 @@ export default function TenantDashboard({ navigation }) {
     setRefreshing(false);
   }, [user?.id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
   if (!user) return null;
 
@@ -102,15 +112,27 @@ export default function TenantDashboard({ navigation }) {
     );
   }
 
-  if (error || !tenantProfile) {
+  if (error) {
     return (
       <View style={styles.centered}>
-        <MaterialIcons name="home" size={40} color={colors.outline} />
-        <Text style={styles.errorTitle}>No active lease found</Text>
-        <Text style={styles.errorMsg}>{error ?? 'Contact your property manager to get set up.'}</Text>
+        <MaterialIcons name="error-outline" size={40} color={colors.error} />
+        <Text style={styles.errorTitle}>Something went wrong</Text>
+        <Text style={styles.errorMsg}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!tenantProfile) {
+    return (
+      <View style={styles.centered}>
+        <MaterialIcons name="home" size={48} color={colors.outline} />
+        <Text style={styles.errorTitle}>No active lease</Text>
+        <Text style={styles.errorMsg}>
+          Contact your property manager to get set up.
+        </Text>
       </View>
     );
   }
