@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -33,6 +34,7 @@ export default function ResidentDataScreen({ navigation }) {
   const fetchTenants = useCallback(async () => {
     if (!user) return;
     setError(null);
+    setLoading(true);
     const { data, error: fetchError } = await supabase
       .from('tenants')
       .select('*, properties(name, city), leases(status, end_date)')
@@ -44,7 +46,7 @@ export default function ResidentDataScreen({ navigation }) {
     setLoading(false);
   }, [user?.id]);
 
-  useEffect(() => { fetchTenants(); }, [fetchTenants]);
+  useFocusEffect(useCallback(() => { fetchTenants(); }, [fetchTenants]));
 
   useEffect(() => {
     const q = query.toLowerCase();
