@@ -27,6 +27,8 @@ export default function RentPaymentScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
+  const [tenantId, setTenantId] = useState(null);
+  const [lease, setLease] = useState(null);
   const [payment, setPayment] = useState(null);
   const [notSetUp, setNotSetUp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,7 @@ export default function RentPaymentScreen({ navigation }) {
     if (!user) return;
     setError(null);
     setNotSetUp(false);
+
     const { data: tenantRows, error: tErr } = await supabase
       .from('tenants')
       .select('id')
@@ -56,21 +59,39 @@ export default function RentPaymentScreen({ navigation }) {
       setLoading(false);
       return;
     }
+    setTenantId(tenantData.id);
 
-    const { data, error: fetchError } = await supabase
-      .from('payments')
-      .select('*, leases(monthly_rent)')
-      .eq('tenant_id', tenantData.id)
-      .in('status', ['pending', 'overdue'])
-      .order('due_date', { ascending: true })
-      .limit(1)
-      .single();
+    // Fetch active lease (for lease_id + monthly_rent) and any pending payment in parallel
+    const [leaseRes, paymentRes] = await Promise.all([
+      supabase
+        .from('leases')
+        .select('id, monthly_rent')
+        .eq('tenant_id', tenantData.id)
+        .eq('status', 'active')
+        .order('end_date', { ascending: false })
+        .limit(1),
+      supabase
+        .from('payments')
+        .select('*')
+        .eq('tenant_id', tenantData.id)
+        .in('status', ['pending', 'overdue'])
+        .order('due_date', { ascending: true })
+        .limit(1),
+    ]);
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      setError(fetchError.message);
-    } else {
-      setPayment(data ?? null);
+    if (leaseRes.error) {
+      setError(leaseRes.error.message);
+      setLoading(false);
+      return;
     }
+    if (paymentRes.error) {
+      setError(paymentRes.error.message);
+      setLoading(false);
+      return;
+    }
+
+    setLease(leaseRes.data?.[0] ?? null);
+    setPayment(paymentRes.data?.[0] ?? null);
     setLoading(false);
   }, [user?.id]);
 
@@ -86,25 +107,59 @@ export default function RentPaymentScreen({ navigation }) {
     return `Due in ${days} day${days === 1 ? '' : 's'}`;
   };
 
-  // Mocked payment — 2-second delay, then navigate to success
   const handleConfirmPay = async () => {
     setPaying(true);
-    // Simulate network delay
+    // Simulate UPI processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const txnId = 'TXN' + Math.floor(Math.random() * 9_000_000_000 + 1_000_000_000);
     const now = new Date().toISOString();
+    const amount = payment?.amount ?? lease?.monthly_rent ?? 0;
+    // Due date: 1st of current month
+    const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+
+    let dbError = null;
 
     if (payment) {
-      await supabase
+      // Existing pending/overdue row — mark it paid
+      const { error } = await supabase
         .from('payments')
-        .update({ status: 'paid', paid_at: now, payment_method: selectedMethod, transaction_id: txnId })
+        .update({
+          status: 'paid',
+          paid_at: now,
+          payment_method: selectedMethod,
+          transaction_id: txnId,
+        })
         .eq('id', payment.id);
+      dbError = error;
+    } else {
+      // No pre-existing row — insert a fresh paid record
+      const { error } = await supabase
+        .from('payments')
+        .insert({
+          tenant_id: tenantId,
+          lease_id: lease?.id ?? null,
+          amount,
+          due_date: dueDate,
+          status: 'paid',
+          paid_at: now,
+          payment_method: selectedMethod,
+          transaction_id: txnId,
+        });
+      dbError = error;
     }
 
     setPaying(false);
+
+    if (dbError) {
+      setError(dbError.message);
+      return;
+    }
+
     navigation.navigate('PaymentSuccess', {
-      amount: payment?.amount ?? 0,
+      amount,
       method: selectedMethod,
       txnId,
       paidAt: now,
@@ -147,7 +202,7 @@ export default function RentPaymentScreen({ navigation }) {
     );
   }
 
-  if (!payment) {
+  if (!payment && !lease) {
     return (
       <View style={styles.container}>
         <ScreenHeader title="Payments" showBell />
@@ -171,20 +226,26 @@ export default function RentPaymentScreen({ navigation }) {
         <View style={styles.amountSection}>
           <Text style={styles.amountLabel}>TOTAL RENT DUE</Text>
           <Text style={styles.amountValue}>
-            ₹{Number(payment.amount).toLocaleString('en-IN')}
+            ₹{Number(payment?.amount ?? lease?.monthly_rent ?? 0).toLocaleString('en-IN')}
           </Text>
           <Text style={styles.amountCurrency}>Current currency: Indian Rupees (₹)</Text>
-          <View style={styles.dueRow}>
-            <StatusChip
-              label={daysUntilDue(payment.due_date)}
-              variant={payment.status === 'overdue' ? 'urgent' : 'pending'}
-            />
-            <Text style={styles.dueDateText}>
-              Due {new Date(payment.due_date).toLocaleDateString('en-IN', {
-                day: 'numeric', month: 'short', year: 'numeric',
-              })}
-            </Text>
-          </View>
+          {payment?.due_date ? (
+            <View style={styles.dueRow}>
+              <StatusChip
+                label={daysUntilDue(payment.due_date)}
+                variant={payment.status === 'overdue' ? 'urgent' : 'pending'}
+              />
+              <Text style={styles.dueDateText}>
+                Due {new Date(payment.due_date).toLocaleDateString('en-IN', {
+                  day: 'numeric', month: 'short', year: 'numeric',
+                })}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.dueRow}>
+              <StatusChip label="Due this month" variant="pending" />
+            </View>
+          )}
         </View>
 
         {/* UPI Methods */}
@@ -228,7 +289,7 @@ export default function RentPaymentScreen({ navigation }) {
         {/* CTA */}
         <View style={styles.ctaSection}>
           <PrimaryButton
-            label={`Confirm & Pay ₹${Number(payment.amount).toLocaleString('en-IN')}`}
+            label={`Confirm & Pay ₹${Number(payment?.amount ?? lease?.monthly_rent ?? 0).toLocaleString('en-IN')}`}
             onPress={handleConfirmPay}
             loading={paying}
             icon="lock"
