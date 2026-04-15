@@ -256,7 +256,11 @@ export default function OwnerDashboard({ navigation }) {
 
         {/* Recent transactions */}
         <View style={styles.section}>
-          <SectionHeader title="Recent Transactions" actionLabel="View ledger" />
+          <SectionHeader
+                title="Recent Transactions"
+                actionLabel="View ledger"
+                onAction={() => navigation.getParent()?.navigate('Finance', { screen: 'RentCollection' })}
+              />
           {transactions.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialIcons name="receipt-long" size={32} color={colors.outline} />

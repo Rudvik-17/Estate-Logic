@@ -7,6 +7,7 @@ import { fonts } from '../theme/typography';
 
 import TenantDashboard from '../screens/tenant/TenantDashboard';
 import RentalAgreementScreen from '../screens/tenant/RentalAgreementScreen';
+import PaymentHistoryScreen from '../screens/tenant/PaymentHistoryScreen';
 import RentPaymentScreen from '../screens/tenant/RentPaymentScreen';
 import PaymentSuccessScreen from '../screens/tenant/PaymentSuccessScreen';
 import MaintenanceRequestScreen from '../screens/tenant/MaintenanceRequestScreen';
@@ -29,6 +30,7 @@ function DashboardStackNav() {
 function PaymentsStackNav() {
   return (
     <PaymentsStack.Navigator screenOptions={{ headerShown: false }}>
+      <PaymentsStack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
       <PaymentsStack.Screen name="RentPayment" component={RentPaymentScreen} />
       <PaymentsStack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} />
     </PaymentsStack.Navigator>

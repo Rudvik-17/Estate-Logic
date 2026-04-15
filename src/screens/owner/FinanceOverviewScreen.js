@@ -21,7 +21,7 @@ import MetricCard from '../../components/MetricCard';
 const EXPENSE_CATEGORIES = ['maintenance', 'staff', 'utilities', 'repair', 'admin', 'other'];
 const REVENUE_CATEGORIES = ['residential', 'commercial', 'parking'];
 
-export default function FinanceOverviewScreen() {
+export default function FinanceOverviewScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
@@ -176,7 +176,7 @@ export default function FinanceOverviewScreen() {
 
         {/* Revenue sources */}
         <View style={styles.section}>
-          <SectionHeader title="Revenue Sources" actionLabel="Full Report" />
+          <SectionHeader title="Revenue Sources" actionLabel="Full Report" onAction={() => navigation.navigate('RentCollection')} />
           {revenueByCat.length === 0 ? (
             <Text style={styles.noDataText}>No revenue recorded</Text>
           ) : (
@@ -194,7 +194,7 @@ export default function FinanceOverviewScreen() {
 
         {/* Expense breakdown */}
         <View style={styles.section}>
-          <SectionHeader title="Expense Breakdown" actionLabel="View Ledger" />
+          <SectionHeader title="Expense Breakdown" actionLabel="View Ledger" onAction={() => navigation.navigate('RentCollection')} />
           {expensesByCat.length === 0 ? (
             <Text style={styles.noDataText}>No expenses recorded</Text>
           ) : (

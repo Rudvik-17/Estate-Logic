@@ -12,6 +12,7 @@ import ResidentDataScreen from '../screens/owner/ResidentDataScreen';
 import TenantOnboardingScreen from '../screens/owner/TenantOnboardingScreen';
 import TenantDetailScreen from '../screens/owner/TenantDetailScreen';
 import FinanceOverviewScreen from '../screens/owner/FinanceOverviewScreen';
+import RentCollectionScreen from '../screens/owner/RentCollectionScreen';
 import ResidentIssuesScreen from '../screens/owner/ResidentIssuesScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 
@@ -45,6 +46,7 @@ function FinanceStackNav() {
   return (
     <FinanceStack.Navigator screenOptions={{ headerShown: false }}>
       <FinanceStack.Screen name="FinanceOverview" component={FinanceOverviewScreen} />
+      <FinanceStack.Screen name="RentCollection" component={RentCollectionScreen} />
     </FinanceStack.Navigator>
   );
 }
