@@ -31,6 +31,7 @@ export default function MaintenanceRequestScreen() {
 
   const [tenantId, setTenantId] = useState(null);
   const [propertyId, setPropertyId] = useState(null);
+  const [notSetUp, setNotSetUp] = useState(false);
   const [activeRequest, setActiveRequest] = useState(null);
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,14 +46,22 @@ export default function MaintenanceRequestScreen() {
   const fetchData = useCallback(async () => {
     if (!user) return;
     setError(null);
-    const { data: tenantData, error: tErr } = await supabase
+    setNotSetUp(false);
+    const { data: tenantRows, error: tErr } = await supabase
       .from('tenants')
       .select('id, property_id')
       .eq('user_id', user.id)
-      .single();
+      .limit(1);
 
-    if (tErr || !tenantData) {
-      setError(tErr?.message ?? 'No tenant record found.');
+    if (tErr) {
+      setError(tErr.message);
+      setLoading(false);
+      return;
+    }
+
+    const tenantData = tenantRows?.[0] ?? null;
+    if (!tenantData) {
+      setNotSetUp(true);
       setLoading(false);
       return;
     }
@@ -137,6 +146,21 @@ export default function MaintenanceRequestScreen() {
         <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (notSetUp) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader title="Maintenance" showBell />
+        <View style={styles.centered}>
+          <MaterialIcons name="home" size={48} color={colors.outline} />
+          <Text style={styles.errorTitle}>Account not set up</Text>
+          <Text style={styles.errorMsg}>
+            Contact your property manager to get linked to your unit.
+          </Text>
+        </View>
       </View>
     );
   }

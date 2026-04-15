@@ -112,8 +112,11 @@ export default function FinanceOverviewScreen() {
       <View style={styles.container}>
         <ScreenHeader title="Finance" showBell />
         <View style={styles.centered}>
-          <MaterialIcons name="account-balance-wallet" size={40} color={colors.outline} />
-          <Text style={styles.emptyText}>No financial data available</Text>
+          <MaterialIcons name="account-balance-wallet" size={48} color={colors.outline} />
+          <Text style={styles.emptyTitle}>No financial data yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Add tenants and record transactions to see your finances.
+          </Text>
         </View>
       </View>
     );
@@ -272,11 +275,21 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
 
-  emptyText: {
+  emptyTitle: {
+    fontFamily: fonts.manropeSemiBold,
+    fontSize: 18,
+    color: colors.onSurface,
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
     fontFamily: fonts.interRegular,
     fontSize: 14,
     color: colors.onSurfaceVariant,
-    marginTop: 12,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 16,
   },
   errorTitle: {
     fontFamily: fonts.manropeSemiBold, fontSize: 18, color: colors.onSurface,

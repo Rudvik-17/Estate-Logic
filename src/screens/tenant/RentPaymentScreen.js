@@ -28,6 +28,7 @@ export default function RentPaymentScreen({ navigation }) {
   const { user } = useAuth();
 
   const [payment, setPayment] = useState(null);
+  const [notSetUp, setNotSetUp] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState('gpay');
@@ -36,14 +37,22 @@ export default function RentPaymentScreen({ navigation }) {
   const fetchPayment = useCallback(async () => {
     if (!user) return;
     setError(null);
-    const { data: tenantData } = await supabase
+    setNotSetUp(false);
+    const { data: tenantRows, error: tErr } = await supabase
       .from('tenants')
       .select('id')
       .eq('user_id', user.id)
-      .single();
+      .limit(1);
 
+    if (tErr) {
+      setError(tErr.message);
+      setLoading(false);
+      return;
+    }
+
+    const tenantData = tenantRows?.[0] ?? null;
     if (!tenantData) {
-      setError('No tenant record found.');
+      setNotSetUp(true);
       setLoading(false);
       return;
     }
@@ -119,6 +128,21 @@ export default function RentPaymentScreen({ navigation }) {
         <TouchableOpacity style={styles.retryBtn} onPress={fetchPayment}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (notSetUp) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader title="Payments" showBell />
+        <View style={styles.centered}>
+          <MaterialIcons name="home" size={48} color={colors.outline} />
+          <Text style={styles.noDueTitle}>Account not set up</Text>
+          <Text style={styles.noDueSubtitle}>
+            Contact your property manager to get linked to your unit.
+          </Text>
+        </View>
       </View>
     );
   }

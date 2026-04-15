@@ -213,7 +213,7 @@ export default function ResidentIssuesScreen() {
             <MaterialIcons name="check-circle" size={40} color={colors.tertiaryFixedDim} />
             <Text style={styles.emptyTitle}>No issues reported</Text>
             <Text style={styles.emptySubtitle}>
-              {filter === 'all' ? 'All clear — no maintenance requests at this time.' : `No ${filter} priority issues found.`}
+              {filter === 'all' ? 'Your property is running smoothly.' : `No ${filter} priority issues found.`}
             </Text>
           </View>
         }
