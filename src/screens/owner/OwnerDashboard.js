@@ -229,7 +229,11 @@ export default function OwnerDashboard({ navigation }) {
         {properties[0] ? (
           <View style={styles.section}>
             <SectionHeader title="Top Performer" actionLabel="View all" />
-            <View style={styles.propertyCard}>
+            <TouchableOpacity
+              style={styles.propertyCard}
+              onPress={() => navigation.navigate('EditProperty', { property: properties[0] })}
+              activeOpacity={0.8}
+            >
               <View style={styles.propertyCardInner}>
                 <View style={styles.propertyIconBg}>
                   <MaterialIcons name="apartment" size={28} color={colors.onPrimary} />
@@ -244,8 +248,9 @@ export default function OwnerDashboard({ navigation }) {
                     {properties[0].total_units} Units · Avg ₹{Number(properties[0].avg_rent).toLocaleString('en-IN')}/mo
                   </Text>
                 </View>
+                <MaterialIcons name="chevron-right" size={20} color={colors.onSurfaceVariant} />
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         ) : null}
 

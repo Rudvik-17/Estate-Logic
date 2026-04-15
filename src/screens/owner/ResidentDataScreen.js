@@ -37,7 +37,7 @@ export default function ResidentDataScreen({ navigation }) {
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from('tenants')
-      .select('*, properties(name, city), leases(status, end_date)')
+      .select('*, properties(name, city), leases(id, status, start_date, end_date, monthly_rent)')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
     if (fetchError) { setError(fetchError.message); setLoading(false); return; }
@@ -71,7 +71,11 @@ export default function ResidentDataScreen({ navigation }) {
     status === 'active' ? 'active' : status === 'pending' ? 'pending' : 'urgent';
 
   const renderTenant = ({ item }) => (
-    <View style={styles.tenantRow}>
+    <TouchableOpacity
+      style={styles.tenantRow}
+      onPress={() => navigation.navigate('TenantDetail', { tenant: item })}
+      activeOpacity={0.8}
+    >
       <View style={styles.avatarCircle}>
         <Text style={styles.avatarInitial}>{item.full_name[0]}</Text>
       </View>
@@ -89,8 +93,9 @@ export default function ResidentDataScreen({ navigation }) {
           label={item.status}
           variant={chipVariant(item.status)}
         />
+        <MaterialIcons name="chevron-right" size={16} color={colors.outline} style={{ marginTop: 4 }} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
