@@ -41,11 +41,15 @@ export default function RentPaymentScreen({ navigation }) {
     setError(null);
     setNotSetUp(false);
 
+    console.log('Current user:', user?.id);
+
     const { data: tenantRows, error: tErr } = await supabase
       .from('tenants')
       .select('id')
       .eq('user_id', user.id)
       .limit(1);
+
+    console.log('Tenant query result:', tenantRows, tErr);
 
     if (tErr) {
       setError(tErr.message);
@@ -79,6 +83,9 @@ export default function RentPaymentScreen({ navigation }) {
         .limit(1),
     ]);
 
+    console.log('Lease query result:', leaseRes.data, leaseRes.error);
+    console.log('Payment query result:', paymentRes.data, paymentRes.error);
+
     if (leaseRes.error) {
       setError(leaseRes.error.message);
       setLoading(false);
@@ -90,8 +97,38 @@ export default function RentPaymentScreen({ navigation }) {
       return;
     }
 
-    setLease(leaseRes.data?.[0] ?? null);
-    setPayment(paymentRes.data?.[0] ?? null);
+    const leaseData = leaseRes.data?.[0] ?? null;
+    let paymentData = paymentRes.data?.[0] ?? null;
+
+    // No pending payment but active lease exists — auto-create a pending row for this month
+    console.log('Auto-creating payment?', !paymentData && leaseData);
+    if (!paymentData && leaseData) {
+      const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+
+      const { data: newPayment, error: insertErr } = await supabase
+        .from('payments')
+        .insert({
+          tenant_id: tenantData.id,
+          lease_id: leaseData.id,
+          amount: leaseData.monthly_rent,
+          due_date: dueDate,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (insertErr) {
+        setError(insertErr.message);
+        setLoading(false);
+        return;
+      }
+      paymentData = newPayment;
+    }
+
+    setLease(leaseData);
+    setPayment(paymentData);
     setLoading(false);
   }, [user?.id]);
 

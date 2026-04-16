@@ -43,14 +43,17 @@ export default function PaymentHistoryScreen({ navigation }) {
     if (!user) return;
     setError(null);
 
-    const { data: tenantRows, error: tErr } = await supabase
+    // Step 1: resolve tenant_id for this user
+    const { data: tenantRows, error: tenantError } = await supabase
       .from('tenants')
       .select('id')
       .eq('user_id', user.id)
       .limit(1);
 
-    if (tErr) {
-      setError(tErr.message);
+    console.log('Tenant lookup:', tenantRows, tenantError);
+
+    if (tenantError) {
+      setError(tenantError.message);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -64,20 +67,23 @@ export default function PaymentHistoryScreen({ navigation }) {
       return;
     }
 
-    const { data, error: fetchError } = await supabase
+    // Step 2: fetch all payments for this tenant directly by tenant_id
+    const { data: paymentsData, error: paymentsError } = await supabase
       .from('payments')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('due_date', { ascending: false });
 
-    if (fetchError) {
-      setError(fetchError.message);
+    console.log('Payments query:', paymentsData, paymentsError);
+
+    if (paymentsError) {
+      setError(paymentsError.message);
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
-    const all = data ?? [];
+    const all = paymentsData ?? [];
     setPayments(all);
     setPendingPayment(
       all.find(p => p.status === 'pending' || p.status === 'overdue') ?? null
