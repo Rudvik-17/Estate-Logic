@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
+import { requestPermissions } from './src/lib/notifications';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -31,6 +32,8 @@ export default function App() {
     const timer = setTimeout(() => setFontTimeout(true), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => { requestPermissions(); }, []);
 
   // Hold render until fonts are ready or 3s timeout has passed.
   // If timeout fires first, screens proceed with system fonts (no crash —

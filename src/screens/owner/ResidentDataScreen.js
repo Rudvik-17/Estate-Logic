@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ export default function ResidentDataScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchTenants = useCallback(async () => {
     if (!user) return;
@@ -40,13 +42,16 @@ export default function ResidentDataScreen({ navigation }) {
       .select('*, properties(name, city), leases(id, status, start_date, end_date, monthly_rent)')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
-    if (fetchError) { setError(fetchError.message); setLoading(false); return; }
+    if (fetchError) { setError(fetchError.message); setLoading(false); setRefreshing(false); return; }
     setTenants(data ?? []);
     setFiltered(data ?? []);
     setLoading(false);
+    setRefreshing(false);
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { fetchTenants(); }, [fetchTenants]));
+
+  const onRefresh = () => { setRefreshing(true); fetchTenants(); };
 
   useEffect(() => {
     const q = query.toLowerCase();
@@ -128,6 +133,9 @@ export default function ResidentDataScreen({ navigation }) {
         keyExtractor={item => item.id}
         renderItem={renderTenant}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <>
             {/* Metrics */}

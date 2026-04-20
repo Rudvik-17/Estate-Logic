@@ -8,10 +8,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { showMaintenanceUpdate } from '../../lib/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
@@ -30,7 +32,7 @@ const PRIORITY_FILTERS = [
 const priorityVariant = (priority) =>
   priority === 'high' ? 'urgent' : priority === 'medium' ? 'pending' : 'active';
 
-export default function ResidentIssuesScreen() {
+export default function ResidentIssuesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
@@ -38,19 +40,31 @@ export default function ResidentIssuesScreen() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchIssues = useCallback(async () => {
     if (!user) return;
     setError(null);
-    const propIds = (await supabase
+    setLoading(true);
+
+    const { data: propData, error: propErr } = await supabase
       .from('properties')
       .select('id')
-      .eq('owner_id', user.id)
-    ).data?.map(p => p.id) ?? [];
+      .eq('owner_id', user.id);
+
+    if (propErr) {
+      setError(propErr.message);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    const propIds = propData?.map(p => p.id) ?? [];
 
     if (propIds.length === 0) {
       setIssues([]);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
@@ -60,12 +74,15 @@ export default function ResidentIssuesScreen() {
       .in('property_id', propIds)
       .order('created_at', { ascending: false });
 
-    if (fetchError) { setError(fetchError.message); setLoading(false); return; }
+    if (fetchError) { setError(fetchError.message); setLoading(false); setRefreshing(false); return; }
     setIssues(data ?? []);
     setLoading(false);
+    setRefreshing(false);
   }, [user?.id]);
 
   useEffect(() => { fetchIssues(); }, [fetchIssues]);
+
+  const onRefresh = () => { setRefreshing(true); fetchIssues(); };
 
   if (!user) return null;
 
@@ -78,6 +95,8 @@ export default function ResidentIssuesScreen() {
       Alert.alert('Error', updateError.message);
       return;
     }
+    const resolved = issues.find(i => i.id === id);
+    if (resolved) showMaintenanceUpdate({ caseNumber: resolved.case_number });
     setIssues(prev => prev.map(i => i.id === id ? { ...i, status: 'resolved', resolution_progress: 100 } : i));
   };
 
@@ -129,13 +148,37 @@ export default function ResidentIssuesScreen() {
             <MaterialIcons name="check-circle" size={14} color={colors.onTertiaryContainer} />
             <Text style={[styles.actionText, { color: colors.onTertiaryContainer }]}>Mark Resolved</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => navigation.navigate('IssueMessages', {
+              issueId: item.id,
+              caseNumber: item.case_number,
+              subject: item.subject,
+              tenantName: item.tenants?.full_name,
+              unitNumber: item.tenants?.unit_number,
+            })}
+          >
             <MaterialIcons name="message" size={14} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.primary }]}>Message Resident</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <StatusChip label="Resolved" variant="active" />
+        <View style={styles.actionRow}>
+          <StatusChip label="Resolved" variant="active" />
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => navigation.navigate('IssueMessages', {
+              issueId: item.id,
+              caseNumber: item.case_number,
+              subject: item.subject,
+              tenantName: item.tenants?.full_name,
+              unitNumber: item.tenants?.unit_number,
+            })}
+          >
+            <MaterialIcons name="message" size={14} color={colors.primary} />
+            <Text style={[styles.actionText, { color: colors.primary }]}>View Messages</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -170,6 +213,9 @@ export default function ResidentIssuesScreen() {
         keyExtractor={item => item.id}
         renderItem={renderIssue}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <>
             {/* Stats */}

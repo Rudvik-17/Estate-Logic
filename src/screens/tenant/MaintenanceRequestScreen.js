@@ -11,6 +11,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +26,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 
 let caseCounter = 4903;
 
-export default function MaintenanceRequestScreen() {
+export default function MaintenanceRequestScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
@@ -36,6 +37,7 @@ export default function MaintenanceRequestScreen() {
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Form state
   const [subject, setSubject] = useState('');
@@ -56,6 +58,7 @@ export default function MaintenanceRequestScreen() {
     if (tErr) {
       setError(tErr.message);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
@@ -63,6 +66,7 @@ export default function MaintenanceRequestScreen() {
     if (!tenantData) {
       setNotSetUp(true);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
     setTenantId(tenantData.id);
@@ -74,15 +78,18 @@ export default function MaintenanceRequestScreen() {
       .eq('tenant_id', tenantData.id)
       .order('created_at', { ascending: false });
 
-    if (rErr) { setError(rErr.message); setLoading(false); return; }
+    if (rErr) { setError(rErr.message); setLoading(false); setRefreshing(false); return; }
 
     const all = requests ?? [];
     setActiveRequest(all.find(r => r.status !== 'resolved') ?? null);
     setResolvedRequests(all.filter(r => r.status === 'resolved'));
     setLoading(false);
+    setRefreshing(false);
   }, [user?.id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   if (!user) return null;
 
@@ -176,6 +183,9 @@ export default function MaintenanceRequestScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          }
         >
           {/* Submit form */}
           <View style={styles.section}>
@@ -259,6 +269,18 @@ export default function MaintenanceRequestScreen() {
                     </Text>
                   </View>
                 ) : null}
+
+                <TouchableOpacity
+                  style={styles.messageBtn}
+                  onPress={() => navigation.navigate('IssueMessages', {
+                    issueId: activeRequest.id,
+                    caseNumber: activeRequest.case_number,
+                    subject: activeRequest.subject,
+                  })}
+                >
+                  <MaterialIcons name="message" size={15} color={colors.primary} />
+                  <Text style={styles.messageBtnText}>Message Owner</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.noActiveCard}>
@@ -285,6 +307,16 @@ export default function MaintenanceRequestScreen() {
                       Completed {formatDate(req.created_at)} · {req.case_number}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('IssueMessages', {
+                      issueId: req.id,
+                      caseNumber: req.case_number,
+                      subject: req.subject,
+                    })}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialIcons name="message" size={18} color={colors.primary} />
+                  </TouchableOpacity>
                 </View>
               ))
             )}
@@ -364,6 +396,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8,
   },
   visitText: { fontFamily: fonts.interRegular, fontSize: 12, color: colors.onSurfaceVariant },
+
+  messageBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 14, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: colors.surfaceContainerLow,
+  },
+  messageBtnText: {
+    fontFamily: fonts.interMedium, fontSize: 13, color: colors.primary,
+  },
 
   noActiveCard: {
     backgroundColor: colors.surfaceContainerLowest,

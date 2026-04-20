@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
@@ -17,6 +19,7 @@ import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import PrimaryButton from '../../components/PrimaryButton';
 import StatusChip from '../../components/StatusChip';
+import { buildLeaseAgreementHTML } from '../../lib/leaseAgreementHTML';
 
 const CLAUSES = [
   {
@@ -40,18 +43,20 @@ export default function RentalAgreementScreen({ navigation, route }) {
 
   const [lease, setLease] = useState(null);
   const [tenant, setTenant] = useState(null);
+  const [ownerName, setOwnerName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [signed, setSigned] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const fetchLease = useCallback(async () => {
     if (!user) return;
     setError(null);
     let query = supabase
       .from('leases')
-      .select('*, properties(name, city), tenants(full_name, unit_number)');
+      .select('*, properties(name, address, city), tenants(full_name, unit_number, owner_id)');
 
     if (leaseId) {
       query = query.eq('id', leaseId);
@@ -71,12 +76,55 @@ export default function RentalAgreementScreen({ navigation, route }) {
     setLease(data);
     setTenant(data?.tenants);
     setSigned(!!data?.signed_at);
+
+    if (data?.tenants?.owner_id) {
+      const { data: ownerRows } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', data.tenants.owner_id)
+        .limit(1);
+      setOwnerName(ownerRows?.[0]?.full_name ?? null);
+    }
+
     setLoading(false);
   }, [leaseId, user?.id]);
 
   useEffect(() => { fetchLease(); }, [fetchLease]);
 
   if (!user) return null;
+
+  const handleDownload = async () => {
+    if (!lease) return;
+    setDownloading(true);
+    try {
+      const property = lease.properties;
+      const html = buildLeaseAgreementHTML({
+        landlordName: ownerName ?? 'Landlord',
+        tenantName: tenant?.full_name ?? 'Tenant',
+        propertyName: property?.name ?? 'Property',
+        propertyAddress: property ? `${property.address}, ${property.city}` : '—',
+        unitNumber: tenant?.unit_number ?? '—',
+        monthlyRent: lease.monthly_rent,
+        startDate: lease.start_date,
+        endDate: lease.end_date,
+        securityDeposit: null,
+        agreementDate: lease.signed_at ?? lease.start_date,
+      });
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save or share your lease agreement',
+          UTI: 'com.adobe.pdf',
+        });
+      }
+    } catch {
+      Alert.alert('Error', 'Could not generate PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleSign = async () => {
     setSigning(true);
@@ -208,9 +256,19 @@ export default function RentalAgreementScreen({ navigation, route }) {
               <Text style={styles.signedText}>Agreement Signed</Text>
             </View>
           )}
-          <TouchableOpacity style={styles.downloadBtn}>
-            <MaterialIcons name="download" size={18} color={colors.primary} />
-            <Text style={styles.downloadText}>Download PDF</Text>
+          <TouchableOpacity
+            style={[styles.downloadBtn, downloading && styles.downloadBtnDisabled]}
+            onPress={handleDownload}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <MaterialIcons name="download" size={18} color={colors.primary} />
+            )}
+            <Text style={styles.downloadText}>
+              {downloading ? 'Generating PDF…' : 'Download PDF'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -276,6 +334,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 14,
   },
+  downloadBtnDisabled: { opacity: 0.5 },
   downloadText: { fontFamily: fonts.interMedium, fontSize: 14, color: colors.primary },
 
   errorTitle: { fontFamily: fonts.manropeSemiBold, fontSize: 18, color: colors.onSurface, marginTop: 12, marginBottom: 6 },

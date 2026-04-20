@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
@@ -19,6 +22,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import MetricCard from '../../components/MetricCard';
 import StatusChip from '../../components/StatusChip';
 import PrimaryButton from '../../components/PrimaryButton';
+import { buildReceiptHTML } from '../../lib/receiptHTML';
 
 const METHOD_LABELS = {
   gpay: 'Google Pay',
@@ -38,19 +42,62 @@ export default function PaymentHistoryScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [tenantInfo, setTenantInfo] = useState(null);
+  const downloadingRef = useRef(new Set());
+  const [downloadingIds, setDownloadingIds] = useState(new Set());
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('tenants')
+      .select('full_name, unit_number, properties(name)')
+      .eq('user_id', user.id)
+      .limit(1)
+      .then(({ data }) => { if (data?.[0]) setTenantInfo(data[0]); });
+  }, [user?.id]);
+
+  const handleDownloadReceipt = useCallback(async (item) => {
+    if (downloadingRef.current.has(item.id)) return;
+    downloadingRef.current.add(item.id);
+    setDownloadingIds(new Set(downloadingRef.current));
+
+    try {
+      const html = buildReceiptHTML({
+        txnId: item.transaction_id ?? item.id,
+        amount: item.amount,
+        method: item.payment_method,
+        paidAt: item.paid_at ?? item.due_date,
+        tenantName: tenantInfo?.full_name ?? 'Tenant',
+        propertyName: tenantInfo?.properties?.name ?? 'Property',
+        unitNumber: tenantInfo?.unit_number ?? '—',
+      });
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save or share your receipt',
+          UTI: 'com.adobe.pdf',
+        });
+      }
+    } catch {
+      Alert.alert('Error', 'Could not generate receipt. Please try again.');
+    } finally {
+      downloadingRef.current.delete(item.id);
+      setDownloadingIds(new Set(downloadingRef.current));
+    }
+  }, [tenantInfo]);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
     setError(null);
+    setLoading(true);
 
-    // Step 1: resolve tenant_id for this user
     const { data: tenantRows, error: tenantError } = await supabase
       .from('tenants')
       .select('id')
       .eq('user_id', user.id)
       .limit(1);
-
-    console.log('Tenant lookup:', tenantRows, tenantError);
 
     if (tenantError) {
       setError(tenantError.message);
@@ -67,14 +114,11 @@ export default function PaymentHistoryScreen({ navigation }) {
       return;
     }
 
-    // Step 2: fetch all payments for this tenant directly by tenant_id
-    const { data: paymentsData, error: paymentsError } = await supabase
+    const { data, error: paymentsError } = await supabase
       .from('payments')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('due_date', { ascending: false });
-
-    console.log('Payments query:', paymentsData, paymentsError);
 
     if (paymentsError) {
       setError(paymentsError.message);
@@ -83,7 +127,8 @@ export default function PaymentHistoryScreen({ navigation }) {
       return;
     }
 
-    const all = paymentsData ?? [];
+    const all = data ?? [];
+
     setPayments(all);
     setPendingPayment(
       all.find(p => p.status === 'pending' || p.status === 'overdue') ?? null
@@ -135,7 +180,29 @@ export default function PaymentHistoryScreen({ navigation }) {
           </Text>
         ) : null}
       </View>
-      <StatusChip label={item.status} variant={statusVariant(item.status)} />
+      {item.status === 'pending' || item.status === 'overdue' ? (
+        <TouchableOpacity
+          style={styles.payNowBtn}
+          onPress={() => navigation.navigate('RentPayment')}
+        >
+          <Text style={styles.payNowBtnText}>Pay Now</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.paidActions}>
+          <StatusChip label={item.status} variant={statusVariant(item.status)} />
+          <TouchableOpacity
+            style={styles.receiptBtn}
+            onPress={() => handleDownloadReceipt(item)}
+            disabled={downloadingIds.has(item.id)}
+          >
+            {downloadingIds.has(item.id) ? (
+              <ActivityIndicator size={14} color={colors.primary} />
+            ) : (
+              <MaterialIcons name="receipt" size={16} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -296,6 +363,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 8,
+  },
+
+  payNowBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  payNowBtnText: {
+    fontFamily: fonts.interSemiBold,
+    fontSize: 12,
+    color: colors.onPrimary,
+  },
+  paidActions: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  receiptBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   errorTitle: { fontFamily: fonts.manropeSemiBold, fontSize: 18, color: colors.onSurface, marginTop: 12, marginBottom: 6 },

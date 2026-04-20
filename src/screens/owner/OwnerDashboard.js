@@ -225,34 +225,42 @@ export default function OwnerDashboard({ navigation }) {
           </View>
         </View>
 
-        {/* Featured property */}
-        {properties[0] ? (
-          <View style={styles.section}>
-            <SectionHeader title="Top Performer" actionLabel="View all" />
-            <TouchableOpacity
-              style={styles.propertyCard}
-              onPress={() => navigation.navigate('EditProperty', { property: properties[0] })}
-              activeOpacity={0.8}
-            >
-              <View style={styles.propertyCardInner}>
-                <View style={styles.propertyIconBg}>
-                  <MaterialIcons name="apartment" size={28} color={colors.onPrimary} />
-                </View>
-                <View style={styles.propertyInfo}>
-                  <Text style={styles.propertyName}>{properties[0].name}</Text>
-                  <View style={styles.propertyMeta}>
-                    <MaterialIcons name="location-on" size={13} color={colors.onSurfaceVariant} />
-                    <Text style={styles.propertyMetaText}>{properties[0].city}</Text>
+        {/* All properties */}
+        <View style={styles.section}>
+          <SectionHeader
+            title={`My Properties (${properties.length})`}
+            actionLabel="Add"
+            onAction={() => navigation.navigate('AddProperty')}
+          />
+          {properties.map(property => {
+            const activeLeaseCount = property.leases?.filter(l => l.status === 'active').length ?? 0;
+            return (
+              <TouchableOpacity
+                key={property.id}
+                style={styles.propertyCard}
+                onPress={() => navigation.navigate('PropertyDetail', { property })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.propertyCardInner}>
+                  <View style={styles.propertyIconBg}>
+                    <MaterialIcons name="apartment" size={28} color={colors.onPrimary} />
                   </View>
-                  <Text style={styles.propertyDetail}>
-                    {properties[0].total_units} Units · Avg ₹{Number(properties[0].avg_rent).toLocaleString('en-IN')}/mo
-                  </Text>
+                  <View style={styles.propertyInfo}>
+                    <Text style={styles.propertyName}>{property.name}</Text>
+                    <View style={styles.propertyMeta}>
+                      <MaterialIcons name="location-on" size={13} color={colors.onSurfaceVariant} />
+                      <Text style={styles.propertyMetaText}>{property.city}</Text>
+                    </View>
+                    <Text style={styles.propertyDetail}>
+                      {activeLeaseCount} / {property.total_units} occupied · Avg ₹{Number(property.avg_rent).toLocaleString('en-IN')}/mo
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={20} color={colors.onSurfaceVariant} />
                 </View>
-                <MaterialIcons name="chevron-right" size={20} color={colors.onSurfaceVariant} />
-              </View>
-            </TouchableOpacity>
-          </View>
-        ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {/* Recent transactions */}
         <View style={styles.section}>

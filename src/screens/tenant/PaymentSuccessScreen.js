@@ -1,25 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
-
-const METHOD_LABELS = {
-  gpay: 'Google Pay',
-  phonepe: 'PhonePe',
-  paytm: 'Paytm',
-};
+import { buildReceiptHTML } from '../../lib/receiptHTML';
 
 export default function PaymentSuccessScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { amount = 0, method = 'gpay', txnId = '', paidAt = new Date().toISOString() } = route?.params ?? {};
+
+  const [tenantInfo, setTenantInfo] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('tenants')
+      .select('full_name, unit_number, properties(name)')
+      .eq('user_id', user.id)
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]) setTenantInfo(data[0]);
+      });
+  }, [user?.id]);
 
   const formattedDate = new Date(paidAt).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -35,6 +52,36 @@ export default function PaymentSuccessScreen({ navigation, route }) {
     { key: 'Transaction ID', value: txnId },
     { key: 'Status', value: 'Confirmed', highlight: true },
   ];
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const html = buildReceiptHTML({
+        txnId,
+        amount,
+        method,
+        paidAt,
+        tenantName: tenantInfo?.full_name ?? 'Tenant',
+        propertyName: tenantInfo?.properties?.name ?? 'Property',
+        unitNumber: tenantInfo?.unit_number ?? '—',
+      });
+
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save or share your receipt',
+          UTI: 'com.adobe.pdf',
+        });
+      }
+    } catch {
+      Alert.alert('Error', 'Could not generate receipt. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -73,9 +120,19 @@ export default function PaymentSuccessScreen({ navigation, route }) {
         </View>
 
         {/* Actions */}
-        <TouchableOpacity style={styles.downloadBtn}>
-          <MaterialIcons name="download" size={18} color={colors.primary} />
-          <Text style={styles.downloadText}>Download Receipt</Text>
+        <TouchableOpacity
+          style={[styles.downloadBtn, downloading && styles.downloadBtnDisabled]}
+          onPress={handleDownload}
+          disabled={downloading}
+        >
+          {downloading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <MaterialIcons name="download" size={18} color={colors.primary} />
+          )}
+          <Text style={styles.downloadText}>
+            {downloading ? 'Generating receipt…' : 'Download Receipt'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -140,7 +197,6 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-start', paddingVertical: 10,
-    borderBottomWidth: 0,
   },
   detailKey: {
     fontFamily: fonts.interRegular, fontSize: 13,
@@ -156,14 +212,17 @@ const styles = StyleSheet.create({
 
   downloadBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderRadius: 8, paddingVertical: 14,
     paddingHorizontal: 28, marginBottom: 12, width: '100%',
     justifyContent: 'center',
   },
+  downloadBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
   downloadText: {
     fontFamily: fonts.interSemiBold, fontSize: 14,
-    color: colors.onPrimary,
+    color: colors.primary,
   },
 
   dashboardBtn: {

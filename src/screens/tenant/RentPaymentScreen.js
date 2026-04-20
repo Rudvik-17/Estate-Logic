@@ -10,6 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { showPaymentConfirmed, scheduleRentReminder } from '../../lib/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
@@ -41,15 +42,11 @@ export default function RentPaymentScreen({ navigation }) {
     setError(null);
     setNotSetUp(false);
 
-    console.log('Current user:', user?.id);
-
     const { data: tenantRows, error: tErr } = await supabase
       .from('tenants')
       .select('id')
       .eq('user_id', user.id)
       .limit(1);
-
-    console.log('Tenant query result:', tenantRows, tErr);
 
     if (tErr) {
       setError(tErr.message);
@@ -65,7 +62,9 @@ export default function RentPaymentScreen({ navigation }) {
     }
     setTenantId(tenantData.id);
 
-    // Fetch active lease (for lease_id + monthly_rent) and any pending payment in parallel
+    const dueDate = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+
+    // Fetch active lease and any pending/overdue payment in parallel
     const [leaseRes, paymentRes] = await Promise.all([
       supabase
         .from('leases')
@@ -83,9 +82,6 @@ export default function RentPaymentScreen({ navigation }) {
         .limit(1),
     ]);
 
-    console.log('Lease query result:', leaseRes.data, leaseRes.error);
-    console.log('Payment query result:', paymentRes.data, paymentRes.error);
-
     if (leaseRes.error) {
       setError(leaseRes.error.message);
       setLoading(false);
@@ -100,36 +96,70 @@ export default function RentPaymentScreen({ navigation }) {
     const leaseData = leaseRes.data?.[0] ?? null;
     let paymentData = paymentRes.data?.[0] ?? null;
 
-    // No pending payment but active lease exists — auto-create a pending row for this month
-    console.log('Auto-creating payment?', !paymentData && leaseData);
+    // Auto-create a pending row only if no row at all exists for this due_date
     if (!paymentData && leaseData) {
-      const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-        .toISOString()
-        .split('T')[0];
-
-      const { data: newPayment, error: insertErr } = await supabase
+      const { data: existing, error: existingErr } = await supabase
         .from('payments')
-        .insert({
-          tenant_id: tenantData.id,
-          lease_id: leaseData.id,
-          amount: leaseData.monthly_rent,
-          due_date: dueDate,
-          status: 'pending',
-        })
-        .select()
-        .single();
+        .select('*')
+        .eq('tenant_id', tenantData.id)
+        .eq('due_date', dueDate)
+        .limit(1);
 
-      if (insertErr) {
-        setError(insertErr.message);
+      // If the query itself fails, skip insert to avoid a constraint crash
+      if (existingErr) {
+        setLease(leaseData);
+        setPayment(null);
         setLoading(false);
         return;
       }
-      paymentData = newPayment;
+
+      if (existing && existing.length > 0) {
+        // Row already exists — use it if still actionable, otherwise nothing due
+        const row = existing[0];
+        paymentData = (row.status === 'pending' || row.status === 'overdue') ? row : null;
+      } else {
+        const { data: newPayment, error: insertErr } = await supabase
+          .from('payments')
+          .insert({
+            tenant_id: tenantData.id,
+            lease_id: leaseData.id,
+            amount: leaseData.monthly_rent,
+            due_date: dueDate,
+            status: 'pending',
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          if (insertErr.code === '23505') {
+            // Race condition: another screen inserted between our check and this insert.
+            // Re-fetch the row that won the race and use it if still actionable.
+            const { data: raceRows } = await supabase
+              .from('payments')
+              .select('*')
+              .eq('tenant_id', tenantData.id)
+              .eq('due_date', dueDate)
+              .limit(1);
+            const row = raceRows?.[0] ?? null;
+            paymentData = (row?.status === 'pending' || row?.status === 'overdue') ? row : null;
+          } else {
+            setError(insertErr.message);
+            setLoading(false);
+            return;
+          }
+        } else {
+          paymentData = newPayment;
+        }
+      }
     }
 
     setLease(leaseData);
     setPayment(paymentData);
     setLoading(false);
+
+    if (paymentData?.due_date) {
+      scheduleRentReminder({ amount: paymentData.amount, dueDate: paymentData.due_date });
+    }
   }, [user?.id]);
 
   useEffect(() => { fetchPayment(); }, [fetchPayment]);
@@ -145,48 +175,24 @@ export default function RentPaymentScreen({ navigation }) {
   };
 
   const handleConfirmPay = async () => {
+    if (!payment) return;
+
     setPaying(true);
     // Simulate UPI processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const txnId = 'TXN' + Math.floor(Math.random() * 9_000_000_000 + 1_000_000_000);
     const now = new Date().toISOString();
-    const amount = payment?.amount ?? lease?.monthly_rent ?? 0;
-    // Due date: 1st of current month
-    const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split('T')[0];
 
-    let dbError = null;
-
-    if (payment) {
-      // Existing pending/overdue row — mark it paid
-      const { error } = await supabase
-        .from('payments')
-        .update({
-          status: 'paid',
-          paid_at: now,
-          payment_method: selectedMethod,
-          transaction_id: txnId,
-        })
-        .eq('id', payment.id);
-      dbError = error;
-    } else {
-      // No pre-existing row — insert a fresh paid record
-      const { error } = await supabase
-        .from('payments')
-        .insert({
-          tenant_id: tenantId,
-          lease_id: lease?.id ?? null,
-          amount,
-          due_date: dueDate,
-          status: 'paid',
-          paid_at: now,
-          payment_method: selectedMethod,
-          transaction_id: txnId,
-        });
-      dbError = error;
-    }
+    const { error: dbError } = await supabase
+      .from('payments')
+      .update({
+        status: 'paid',
+        paid_at: now,
+        payment_method: selectedMethod,
+        transaction_id: txnId,
+      })
+      .eq('id', payment.id);
 
     setPaying(false);
 
@@ -195,8 +201,10 @@ export default function RentPaymentScreen({ navigation }) {
       return;
     }
 
+    showPaymentConfirmed({ amount: payment.amount, method: selectedMethod });
+
     navigation.navigate('PaymentSuccess', {
-      amount,
+      amount: payment.amount,
       method: selectedMethod,
       txnId,
       paidAt: now,
@@ -239,7 +247,7 @@ export default function RentPaymentScreen({ navigation }) {
     );
   }
 
-  if (!payment && !lease) {
+  if (!payment) {
     return (
       <View style={styles.container}>
         <ScreenHeader title="Payments" showBell />

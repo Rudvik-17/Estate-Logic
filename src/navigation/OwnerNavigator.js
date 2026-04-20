@@ -8,12 +8,14 @@ import { fonts } from '../theme/typography';
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import AddPropertyScreen from '../screens/owner/AddPropertyScreen';
 import EditPropertyScreen from '../screens/owner/EditPropertyScreen';
+import PropertyDetailScreen from '../screens/owner/PropertyDetailScreen';
 import ResidentDataScreen from '../screens/owner/ResidentDataScreen';
 import TenantOnboardingScreen from '../screens/owner/TenantOnboardingScreen';
 import TenantDetailScreen from '../screens/owner/TenantDetailScreen';
 import FinanceOverviewScreen from '../screens/owner/FinanceOverviewScreen';
 import RentCollectionScreen from '../screens/owner/RentCollectionScreen';
 import ResidentIssuesScreen from '../screens/owner/ResidentIssuesScreen';
+import IssueMessagesScreen from '../screens/shared/IssueMessagesScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -27,6 +29,7 @@ function PortfolioStackNav() {
     <PortfolioStack.Navigator screenOptions={{ headerShown: false }}>
       <PortfolioStack.Screen name="OwnerDashboard" component={OwnerDashboard} />
       <PortfolioStack.Screen name="AddProperty" component={AddPropertyScreen} />
+      <PortfolioStack.Screen name="PropertyDetail" component={PropertyDetailScreen} />
       <PortfolioStack.Screen name="EditProperty" component={EditPropertyScreen} />
     </PortfolioStack.Navigator>
   );
@@ -55,6 +58,7 @@ function IssuesStackNav() {
   return (
     <IssuesStack.Navigator screenOptions={{ headerShown: false }}>
       <IssuesStack.Screen name="ResidentIssues" component={ResidentIssuesScreen} />
+      <IssuesStack.Screen name="IssueMessages" component={IssueMessagesScreen} />
     </IssuesStack.Navigator>
   );
 }

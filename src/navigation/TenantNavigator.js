@@ -11,6 +11,7 @@ import PaymentHistoryScreen from '../screens/tenant/PaymentHistoryScreen';
 import RentPaymentScreen from '../screens/tenant/RentPaymentScreen';
 import PaymentSuccessScreen from '../screens/tenant/PaymentSuccessScreen';
 import MaintenanceRequestScreen from '../screens/tenant/MaintenanceRequestScreen';
+import IssueMessagesScreen from '../screens/shared/IssueMessagesScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -41,6 +42,7 @@ function MaintenanceStackNav() {
   return (
     <MaintenanceStack.Navigator screenOptions={{ headerShown: false }}>
       <MaintenanceStack.Screen name="MaintenanceRequest" component={MaintenanceRequestScreen} />
+      <MaintenanceStack.Screen name="IssueMessages" component={IssueMessagesScreen} />
     </MaintenanceStack.Navigator>
   );
 }

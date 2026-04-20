@@ -22,6 +22,13 @@ import PrimaryButton from '../../components/PrimaryButton';
 const CITIES = ['Bangalore', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata'];
 const TOTAL_STEPS = 3;
 
+const PROPERTY_TYPES = [
+  { key: 'apartment', label: 'Apartment', icon: 'apartment' },
+  { key: 'house',     label: 'House',     icon: 'house' },
+  { key: 'villa',     label: 'Villa',     icon: 'home' },
+  { key: 'commercial', label: 'Commercial', icon: 'business' },
+];
+
 export default function AddPropertyScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -33,6 +40,9 @@ export default function AddPropertyScreen({ navigation }) {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Step 1 — property type
+  const [propertyType, setPropertyType] = useState('apartment');
 
   // Step 2
   const [totalUnits, setTotalUnits] = useState('');
@@ -95,22 +105,39 @@ export default function AddPropertyScreen({ navigation }) {
   const handleConfirm = async () => {
     setSubmitError(null);
     setLoading(true);
-    const { error: insertError } = await supabase.from('properties').insert({
-      owner_id: user.id,
-      name: name.trim(),
-      address: address.trim(),
-      city: city.trim(),
-      total_units: Number(totalUnits),
-      avg_rent: Number(avgRent),
-    });
-    setLoading(false);
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('properties')
+      .insert({
+        owner_id: user.id,
+        name: name.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        total_units: Number(totalUnits),
+        avg_rent: Number(avgRent),
+        property_type: propertyType,
+      })
+      .select('id')
+      .single();
+
     if (insertError) {
       setSubmitError(insertError.message);
+      setLoading(false);
       return;
     }
+
+    // Batch-insert unit rows (best-effort — non-blocking if units table isn't migrated yet)
+    const count = Math.min(Number(totalUnits), 500);
+    const unitRows = Array.from({ length: count }, (_, i) => ({
+      property_id: inserted.id,
+      unit_number: String(101 + i),
+    }));
+    await supabase.from('units').insert(unitRows);
+
+    setLoading(false);
     Alert.alert(
       'Property Added',
-      `${name.trim()} has been added to your portfolio.`,
+      `${name.trim()} has been added to your portfolio with ${count} unit${count > 1 ? 's' : ''}.`,
       [{ text: 'Done', onPress: () => navigation.goBack() }],
     );
   };
@@ -141,7 +168,28 @@ export default function AddPropertyScreen({ navigation }) {
       <Text style={styles.stepTitle}>Property Details</Text>
       <Text style={styles.stepSubtitle}>Tell us about this property</Text>
 
-      <Text style={styles.fieldLabel}>PROPERTY NAME</Text>
+      <Text style={styles.fieldLabel}>PROPERTY TYPE</Text>
+      <View style={styles.typeGrid}>
+        {PROPERTY_TYPES.map(pt => (
+          <TouchableOpacity
+            key={pt.key}
+            style={[styles.typeChip, propertyType === pt.key && styles.typeChipActive]}
+            onPress={() => setPropertyType(pt.key)}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons
+              name={pt.icon}
+              size={20}
+              color={propertyType === pt.key ? colors.onPrimary : colors.onSurfaceVariant}
+            />
+            <Text style={[styles.typeChipLabel, propertyType === pt.key && styles.typeChipLabelActive]}>
+              {pt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>PROPERTY NAME</Text>
       <TextInput
         style={[styles.input, errors.name && styles.inputError]}
         value={name}
@@ -241,6 +289,7 @@ export default function AddPropertyScreen({ navigation }) {
   // ── Step 3: Review & Confirm ─────────────────────────────────────────────────
 
   const annualRevenue = Number(avgRent) * Number(totalUnits) * 12;
+  const selectedType = PROPERTY_TYPES.find(pt => pt.key === propertyType);
 
   const renderStep3 = () => (
     <View>
@@ -251,7 +300,7 @@ export default function AddPropertyScreen({ navigation }) {
         {/* Property header */}
         <View style={styles.reviewHeader}>
           <View style={styles.reviewIconBg}>
-            <MaterialIcons name="apartment" size={26} color={colors.onPrimary} />
+            <MaterialIcons name={selectedType?.icon ?? 'apartment'} size={26} color={colors.onPrimary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.reviewPropertyName}>{name}</Text>
@@ -264,6 +313,7 @@ export default function AddPropertyScreen({ navigation }) {
 
         <View style={styles.reviewDivider} />
 
+        <ReviewDetail icon={selectedType?.icon ?? 'apartment'} label="Property Type" value={selectedType?.label ?? 'Apartment'} />
         <ReviewDetail icon="home" label="Address" value={address} />
         <ReviewDetail icon="domain" label="Total Units" value={totalUnits} />
         <ReviewDetail
@@ -442,6 +492,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.error,
     marginTop: 4,
+  },
+
+  // ── Property type picker ──────────────────────────────────────────────────────
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 4,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerHighest,
+  },
+  typeChipActive: {
+    backgroundColor: colors.primary,
+  },
+  typeChipLabel: {
+    fontFamily: fonts.interMedium,
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+  },
+  typeChipLabelActive: {
+    color: colors.onPrimary,
   },
 
   // ── City suggestions ──────────────────────────────────────────────────────────

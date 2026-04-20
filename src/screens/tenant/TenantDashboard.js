@@ -8,13 +8,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
+import { buildLeaseAgreementHTML } from '../../lib/leaseAgreementHTML';
 import ScreenHeader from '../../components/ScreenHeader';
 import SectionHeader from '../../components/SectionHeader';
 import StatusChip from '../../components/StatusChip';
@@ -26,11 +30,13 @@ export default function TenantDashboard({ navigation }) {
 
   const [tenantProfile, setTenantProfile] = useState(null);
   const [lease, setLease] = useState(null);
+  const [ownerName, setOwnerName] = useState(null);
   const [pendingPayment, setPendingPayment] = useState(null);
   const [activeIssues, setActiveIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -62,6 +68,15 @@ export default function TenantDashboard({ navigation }) {
       return;
     }
     setTenantProfile(tenantData);
+
+    if (tenantData.owner_id) {
+      supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', tenantData.owner_id)
+        .limit(1)
+        .then(({ data: ownerRows }) => setOwnerName(ownerRows?.[0]?.full_name ?? null));
+    }
 
     const [leaseRes, paymentRes, issuesRes] = await Promise.all([
       // Most recent active lease — limit(1) avoids the multi-row crash
@@ -100,6 +115,39 @@ export default function TenantDashboard({ navigation }) {
   if (!user) return null;
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
+
+  const handleLeaseDownload = async () => {
+    if (!lease || !tenantProfile) return;
+    setDownloading(true);
+    try {
+      const property = tenantProfile.properties;
+      const html = buildLeaseAgreementHTML({
+        landlordName: ownerName ?? 'Landlord',
+        tenantName: tenantProfile.full_name,
+        propertyName: property?.name ?? 'Property',
+        propertyAddress: property ? `${property.address}, ${property.city}` : '—',
+        unitNumber: tenantProfile.unit_number,
+        monthlyRent: lease.monthly_rent,
+        startDate: lease.start_date,
+        endDate: lease.end_date,
+        securityDeposit: null,
+        agreementDate: lease.signed_at ?? lease.start_date,
+      });
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save or share your lease agreement',
+          UTI: 'com.adobe.pdf',
+        });
+      }
+    } catch {
+      Alert.alert('Error', 'Could not generate PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const formatDate = (d) =>
     new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -158,7 +206,7 @@ export default function TenantDashboard({ navigation }) {
         </View>
 
         {/* Monthly Rent Card */}
-        {pendingPayment || lease ? (
+        {pendingPayment ? (
           <View style={styles.rentCard}>
             <View style={styles.rentCardHeader}>
               <Text style={styles.rentCardLabel}>Monthly Rent</Text>
@@ -168,7 +216,7 @@ export default function TenantDashboard({ navigation }) {
               />
             </View>
             <Text style={styles.rentAmount}>
-              ₹{Number(pendingPayment?.amount ?? lease?.monthly_rent ?? 0).toLocaleString('en-IN')}
+              ₹{Number(pendingPayment.amount).toLocaleString('en-IN')}
             </Text>
             {pendingPayment?.due_date ? (
               <Text style={styles.rentDue}>Due {formatDate(pendingPayment.due_date)}</Text>
@@ -176,7 +224,7 @@ export default function TenantDashboard({ navigation }) {
             <View style={styles.rentActions}>
               <PrimaryButton
                 label="Pay Now"
-                onPress={() => navigation.navigate('Payments')}
+                onPress={() => navigation.getParent().navigate('Payments', { screen: 'RentPayment' })}
                 icon="arrow-forward"
               />
               <TouchableOpacity style={styles.viewStatementBtn}>
@@ -252,7 +300,11 @@ export default function TenantDashboard({ navigation }) {
                   Signed {lease.signed_at ? formatDate(lease.signed_at) : 'Pending signature'}
                 </Text>
               </View>
-              <MaterialIcons name="download" size={20} color={colors.primary} />
+              <TouchableOpacity onPress={handleLeaseDownload} disabled={downloading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                {downloading
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <MaterialIcons name="download" size={20} color={colors.primary} />}
+              </TouchableOpacity>
             </View>
           ) : (
             <Text style={styles.noDocText}>No documents on file</Text>
