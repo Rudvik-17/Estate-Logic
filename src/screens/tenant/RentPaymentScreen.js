@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Linking,
+  AppState,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +26,19 @@ const UPI_METHODS = [
   { key: 'paytm', label: 'Paytm', sub: 'Fast checkout with Paytm Postpaid', icon: 'account-balance-wallet' },
 ];
 
+const OWNER_UPI_ID = 'estatelogic@upi';
+
+function buildUpiUrl(amount) {
+  const params = new URLSearchParams({
+    pa: OWNER_UPI_ID,
+    pn: 'EstateLogic',
+    am: String(amount),
+    cu: 'INR',
+    tn: 'Rent Payment',
+  });
+  return `upi://pay?${params.toString()}`;
+}
+
 export default function RentPaymentScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -36,6 +51,7 @@ export default function RentPaymentScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState('gpay');
   const [paying, setPaying] = useState(false);
+  const awaitingUpiReturn = useRef(false);
 
   const fetchPayment = useCallback(async () => {
     if (!user) return;
@@ -164,23 +180,8 @@ export default function RentPaymentScreen({ navigation }) {
 
   useEffect(() => { fetchPayment(); }, [fetchPayment]);
 
-  if (!user) return null;
-
-  const daysUntilDue = (dueDate) => {
-    const diff = new Date(dueDate).getTime() - Date.now();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days < 0) return `${Math.abs(days)} days overdue`;
-    if (days === 0) return 'Due today';
-    return `Due in ${days} day${days === 1 ? '' : 's'}`;
-  };
-
-  const handleConfirmPay = async () => {
-    if (!payment) return;
-
-    setPaying(true);
-    // Simulate UPI processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
+  // Shared logic: write the paid row and navigate to success
+  const markPaymentPaid = useCallback(async () => {
     const txnId = 'TXN' + Math.floor(Math.random() * 9_000_000_000 + 1_000_000_000);
     const now = new Date().toISOString();
 
@@ -202,13 +203,66 @@ export default function RentPaymentScreen({ navigation }) {
     }
 
     showPaymentConfirmed({ amount: payment.amount, method: selectedMethod });
-
     navigation.navigate('PaymentSuccess', {
       amount: payment.amount,
       method: selectedMethod,
       txnId,
       paidAt: now,
     });
+  }, [payment, selectedMethod, navigation]);
+
+  // When the user returns from their UPI app, complete the payment
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active' && awaitingUpiReturn.current) {
+        awaitingUpiReturn.current = false;
+        await markPaymentPaid();
+      }
+    });
+    return () => subscription.remove();
+  }, [markPaymentPaid]);
+
+  if (!user) return null;
+
+  const daysUntilDue = (dueDate) => {
+    const diff = new Date(dueDate).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (days < 0) return `${Math.abs(days)} days overdue`;
+    if (days === 0) return 'Due today';
+    return `Due in ${days} day${days === 1 ? '' : 's'}`;
+  };
+
+  const handleConfirmPay = async () => {
+    if (!payment) return;
+    setPaying(true);
+
+    const upiUrl = buildUpiUrl(payment.amount);
+    let upiAvailable = false;
+    try {
+      upiAvailable = await Linking.canOpenURL(upiUrl);
+    } catch {
+      upiAvailable = false;
+    }
+
+    if (upiAvailable) {
+      // Hand off to UPI app; markPaymentPaid fires when user returns via AppState listener
+      awaitingUpiReturn.current = true;
+      try {
+        await Linking.openURL(upiUrl);
+      } catch {
+        // openURL failed (e.g. no matching app despite canOpenURL returning true)
+        awaitingUpiReturn.current = false;
+        await simulatePay();
+      }
+    } else {
+      // Simulator or device with no UPI apps — simulate the flow
+      await simulatePay();
+    }
+  };
+
+  const simulatePay = async () => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    await markPaymentPaid();
   };
 
   if (loading) {
@@ -340,7 +394,7 @@ export default function RentPaymentScreen({ navigation }) {
             icon="lock"
           />
           <Text style={styles.mockNote}>
-            * Payment is simulated. No real transaction will occur.
+            Opens your UPI app to complete payment. Simulated on devices without UPI apps.
           </Text>
         </View>
       </ScrollView>

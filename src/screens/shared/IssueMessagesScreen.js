@@ -38,18 +38,21 @@ export default function IssueMessagesScreen({ navigation, route }) {
   // Fetch current user's display name once
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from('users')
-      .select('full_name')
-      .eq('id', user.id)
-      .limit(1)
-      .then(({ data }) => {
-        const dbName = data?.[0]?.full_name;
-        const metaName = user.user_metadata?.full_name;
-        const emailName = user.email?.split('@')[0];
-        setSenderName(dbName || metaName || emailName || (role === 'owner' ? 'Owner' : 'Tenant'));
-      });
-  }, [user?.id, role]);
+    const resolveDisplayName = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', user.id)
+        .limit(1);
+      const dbName = data?.[0]?.full_name;
+      // user_metadata.full_name (email signup) or name (Google OAuth)
+      const metaName = user.user_metadata?.full_name || user.user_metadata?.name;
+      const email = user.email ?? '';
+      const emailName = email.includes('@') ? email.split('@')[0] : '';
+      setSenderName(dbName || metaName || emailName || 'Me');
+    };
+    resolveDisplayName();
+  }, [user?.id]);
 
   const fetchMessages = useCallback(async () => {
     if (!user || !issueId) return;
@@ -155,7 +158,12 @@ export default function IssueMessagesScreen({ navigation, route }) {
           <View style={styles.bubbleColumn}>
             {!isOwn && (
               <Text style={styles.senderLabel}>
-                {item.sender_name} · {item.sender_role === 'owner' ? 'Owner' : 'Tenant'}
+                {(() => {
+                  const roleLabel = item.sender_role === 'owner' ? 'Owner' : 'Tenant';
+                  const name = item.sender_name;
+                  if (!name || name === roleLabel) return roleLabel;
+                  return `${name} · ${roleLabel}`;
+                })()}
               </Text>
             )}
             <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
