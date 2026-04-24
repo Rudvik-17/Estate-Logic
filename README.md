@@ -70,7 +70,35 @@ The backend is powered by Supabase with PostgreSQL, row-level security policies 
 
 ## Screenshots
 
-Screenshots coming soon.
+### Owner Side
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/01-login.png" width="200" /><br/>Login</td>
+    <td align="center"><img src="screenshots/02-owner-portfolio.png" width="200" /><br/>Portfolio</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/03-owner-residents.png" width="200" /><br/>Residents</td>
+    <td align="center"><img src="screenshots/04-owner-finance.png" width="200" /><br/>Finance</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/05-owner-issues.png" width="200" /><br/>Issues</td>
+    <td align="center"><img src="screenshots/06-owner-profile.png" width="200" /><br/>Profile</td>
+  </tr>
+</table>
+
+### Tenant Side
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/07-tenant-dashboard.png" width="200" /><br/>Dashboard</td>
+    <td align="center"><img src="screenshots/08-tenant-payments.png" width="200" /><br/>Payments</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/09-tenant-maintenance.png" width="200" /><br/>Maintenance</td>
+    <td align="center"><img src="screenshots/10-tenant-profile.png" width="200" /><br/>Profile</td>
+  </tr>
+</table>
 
 ---
 
