@@ -53,7 +53,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, position: 'relative' }}>
           <RootNavigator />
           {splashActive && (
             <SplashAnimation onFinish={handleSplashFinish} />

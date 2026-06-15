@@ -142,11 +142,16 @@ export default function SplashAnimation({ onFinish }) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#0C0B14', // Sleek dark mode background
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 99999,
+    elevation: 99999,
   },
   glow: {
     position: 'absolute',

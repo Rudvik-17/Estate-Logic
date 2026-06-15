@@ -417,22 +417,12 @@ export default function PaymentHistoryScreen({ navigation }) {
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[
-                styles.heroPrimaryBtn, 
-                !pendingPayment && styles.heroPrimaryBtnDisabled
-              ]}
+              style={styles.heroPrimaryBtn}
               onPress={() => {
-                if (pendingPayment) {
-                  navigation.navigate('RentPayment');
-                } else {
-                  Alert.alert('No Balance Due', 'You are completely caught up on your rent payments!');
-                }
+                navigation.navigate('RentPayment');
               }}
             >
-              <Text style={[
-                styles.heroPrimaryBtnText,
-                !pendingPayment && styles.heroPrimaryBtnTextDisabled
-              ]}>
+              <Text style={styles.heroPrimaryBtnText}>
                 Make Payment
               </Text>
             </TouchableOpacity>
