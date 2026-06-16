@@ -35,6 +35,27 @@ function generateRazorpayHtml(keyId, amount, email, name, phone, orderId) {
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script>
+          // Redirect console logs to React Native
+          (function() {
+            var origLog = console.log;
+            console.log = function(...args) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                status: 'console_log',
+                message: args.join(' ')
+              }));
+              origLog.apply(console, args);
+            };
+            var origErr = console.error;
+            console.error = function(...args) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                status: 'console_error',
+                message: args.join(' ')
+              }));
+              origErr.apply(console, args);
+            };
+          })();
+        </script>
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <style>
           body {
@@ -84,11 +105,7 @@ function generateRazorpayHtml(keyId, amount, email, name, phone, orderId) {
                 "name": "Tenura",
                 "description": "Rent Payment",
                 "order_id": "${orderId || ''}",
-                "prefill": {
-                  "name": "${name || ''}",
-                  "email": "${email || ''}",
-                  "contact": "${phone || ''}"
-                },
+                "prefill": {},
                 "theme": {
                   "color": "#3399cc"
                 },
@@ -109,9 +126,18 @@ function generateRazorpayHtml(keyId, amount, email, name, phone, orderId) {
                 }
               };
               
+              const prefillName = "${name || ''}";
+              const prefillEmail = "${email || ''}";
+              const prefillPhone = "${phone || ''}";
+              
+              if (prefillName) options.prefill.name = prefillName;
+              if (prefillEmail) options.prefill.email = prefillEmail;
+              if (prefillPhone) options.prefill.contact = prefillPhone;
+              
               const rzp = new Razorpay(options);
               
               rzp.on('payment.failed', function (response) {
+                console.error('Razorpay Payment Failed details: ' + JSON.stringify(response.error));
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   status: 'failed',
                   error: response.error
@@ -184,6 +210,7 @@ export default function RentPaymentScreen({ navigation }) {
   const { user } = useAuth();
 
   const [tenantId, setTenantId] = useState(null);
+  const [tenantPhone, setTenantPhone] = useState('');
   const [lease, setLease] = useState(null);
   const [payment, setPayment] = useState(null);
   const [notSetUp, setNotSetUp] = useState(false);
@@ -214,7 +241,7 @@ export default function RentPaymentScreen({ navigation }) {
 
     const { data: tenantRows, error: tErr } = await supabase
       .from('tenants')
-      .select('id')
+      .select('id, phone')
       .eq('user_id', user.id)
       .limit(1);
 
@@ -227,6 +254,7 @@ export default function RentPaymentScreen({ navigation }) {
     const tenantData = tenantRows?.[0] ?? null;
     if (!tenantData) {
       setTenantId('mock-tenant-id');
+      setTenantPhone('9999999999');
       setLease({ monthly_rent: 15000 });
       setPayment({
         id: 'mock-payment-id',
@@ -239,6 +267,7 @@ export default function RentPaymentScreen({ navigation }) {
       return;
     }
     setTenantId(tenantData.id);
+    setTenantPhone(tenantData.phone || '');
 
     const dueDate = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
 
@@ -392,6 +421,22 @@ export default function RentPaymentScreen({ navigation }) {
 
   const verifyRazorpayPayment = useCallback(async (orderId, paymentId, signature) => {
     setPaying(true);
+
+    // Bypassing verification for mock payments to prevent DB UUID casting error
+    if (payment && payment.id === 'mock-payment-id') {
+      setPaying(false);
+      const txnId = paymentId || ('TXN' + Math.floor(Math.random() * 9_000_000_000 + 1_000_000_000));
+      const now = new Date().toISOString();
+      showPaymentConfirmed({ amount: payment.amount, method: selectedMethod });
+      navigation.navigate('PaymentSuccess', {
+        amount: payment.amount,
+        method: selectedMethod,
+        txnId,
+        paidAt: now,
+      });
+      return;
+    }
+
     try {
       const { data: funcData, error: funcError } = await supabase.functions.invoke('razorpay', {
         body: {
@@ -489,7 +534,7 @@ export default function RentPaymentScreen({ navigation }) {
         const orderId = funcData.orderId;
         const email = user.email || '';
         const name = user.user_metadata?.full_name || 'Tenant';
-        const phone = ''; // Prefill phone if available
+        const phone = tenantPhone || '9999999999';
         
         const html = generateRazorpayHtml(keyId, payment.amount, email, name, phone, orderId);
         setRazorpayHtml(html);
@@ -1012,10 +1057,18 @@ export default function RentPaymentScreen({ navigation }) {
           
           <WebView
             originWhitelist={['*']}
-            source={{ html: razorpayHtml }}
+            source={{ html: razorpayHtml, baseUrl: 'https://olswwdunaivwxefelasc.supabase.co' }}
             onMessage={(event) => {
               try {
                 const data = JSON.parse(event.nativeEvent.data);
+                if (data.status === 'console_log') {
+                  console.log('[WebView Console]', data.message);
+                  return;
+                }
+                if (data.status === 'console_error') {
+                  console.log('[WebView Console Error]', data.message);
+                  return;
+                }
                 if (data.status === 'success') {
                   setShowRealRazorpay(false);
                   verifyRazorpayPayment(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature);
@@ -1032,13 +1085,20 @@ export default function RentPaymentScreen({ navigation }) {
                   Alert.alert('Error', data.message || 'An error occurred initializing Razorpay.');
                 }
               } catch (e) {
-                setShowRealRazorpay(false);
-                setPaying(false);
+                // Ignore parse errors for non-JSON string messages to prevent unexpected crashes/closures
+                console.log('[WebView PostMessage (Non-JSON)]', event.nativeEvent.data);
               }
+            }}
+            onNavigationStateChange={(navState) => {
+              console.log('[WebView Navigation]', navState.url, 'loading:', navState.loading);
             }}
             style={{ flex: 1 }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
+            javaScriptCanOpenWindowsAutomatically={true}
+            mixedContentMode="always"
+            thirdPartyCookiesEnabled={true}
+            allowsInlineMediaPlayback={true}
             startInLoadingState={true}
             renderLoading={() => (
               <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }]}>
