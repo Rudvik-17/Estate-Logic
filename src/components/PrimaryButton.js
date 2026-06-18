@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  TouchableOpacity,
   Text,
   ActivityIndicator,
   StyleSheet,
@@ -10,12 +9,13 @@ import PropTypes from 'prop-types';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { fonts } from '../theme/typography';
+import { RateLimitedButton } from './RateLimitedButton';
 
 export default function PrimaryButton({ label, onPress, icon, disabled, loading }) {
   const { colors } = useTheme();
   const styles = getStyles(colors);
   return (
-    <TouchableOpacity
+    <RateLimitedButton
       style={[styles.button, (disabled || loading) && styles.buttonDisabled]}
       onPress={onPress}
       disabled={disabled || loading}
@@ -36,7 +36,7 @@ export default function PrimaryButton({ label, onPress, icon, disabled, loading 
           <Text style={styles.label}>{label}</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </RateLimitedButton>
   );
 }
 

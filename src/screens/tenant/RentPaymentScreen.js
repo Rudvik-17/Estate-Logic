@@ -26,6 +26,7 @@ import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 function generateRazorpayHtml(keyId, amount, email, name, phone, orderId) {
   const amountInPaise = Math.round(amount * 100);
@@ -630,9 +631,9 @@ export default function RentPaymentScreen({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load payment</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchPayment}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchPayment}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }
@@ -1006,7 +1007,7 @@ export default function RentPaymentScreen({ navigation }) {
               </View>
 
               {/* Pay Button */}
-              <TouchableOpacity
+              <RateLimitedButton
                 style={styles.rzpPayBtn}
                 onPress={handleRazorpaySubmit}
                 disabled={razorpayPaying}
@@ -1018,7 +1019,7 @@ export default function RentPaymentScreen({ navigation }) {
                     Pay ₹{Number(payment?.amount ?? lease?.monthly_rent ?? 0).toLocaleString('en-IN')}
                   </Text>
                 )}
-              </TouchableOpacity>
+              </RateLimitedButton>
 
               {/* Footer */}
               <View style={styles.rzpFooter}>

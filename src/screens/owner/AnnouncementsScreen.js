@@ -19,6 +19,7 @@ import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedIconButton } from '../../components/RateLimitedIconButton';
 
 export default function AnnouncementsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -176,13 +177,12 @@ export default function AnnouncementsScreen({ navigation }) {
           <Text style={styles.propName}>{item.properties?.name}</Text>
           <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
         </View>
-        <TouchableOpacity
+        <RateLimitedIconButton
           style={styles.deleteBtn}
           onPress={() => handleDeleteAnnouncement(item.id)}
           activeOpacity={0.7}
-        >
-          <MaterialIcons name="delete-outline" size={20} color={colors.error} />
-        </TouchableOpacity>
+          icon={<MaterialIcons name="delete-outline" size={20} color={colors.error} />}
+        />
       </View>
 
       <Text style={styles.titleText}>{item.title}</Text>

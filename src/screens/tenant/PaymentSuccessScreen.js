@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts } from '../../theme/typography';
 import { buildReceiptHTML } from '../../lib/receiptHTML';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 const METHOD_LABELS = {
   gpay: 'Google Pay',
@@ -128,7 +129,7 @@ export default function PaymentSuccessScreen({ navigation, route }) {
         </View>
 
         {/* Actions */}
-        <TouchableOpacity
+        <RateLimitedButton
           style={[styles.downloadBtn, downloading && styles.downloadBtnDisabled]}
           onPress={handleDownload}
           disabled={downloading}
@@ -141,7 +142,7 @@ export default function PaymentSuccessScreen({ navigation, route }) {
           <Text style={styles.downloadText}>
             {downloading ? 'Generating receipt…' : 'Download Receipt'}
           </Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
 
         <TouchableOpacity
           style={styles.dashboardBtn}

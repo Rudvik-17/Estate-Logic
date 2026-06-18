@@ -20,6 +20,7 @@ import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function TenantDetailScreen({ navigation, route }) {
   const { colors } = useTheme();
@@ -334,7 +335,7 @@ export default function TenantDetailScreen({ navigation, route }) {
                 <Text style={styles.editBtnText}>Edit Tenant</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <RateLimitedButton
                 style={styles.removeBtn}
                 onPress={handleRemove}
                 disabled={removing}
@@ -347,7 +348,7 @@ export default function TenantDetailScreen({ navigation, route }) {
                     <Text style={styles.removeBtnText}>Remove Tenant</Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </RateLimitedButton>
             </View>
           )}
         </ScrollView>

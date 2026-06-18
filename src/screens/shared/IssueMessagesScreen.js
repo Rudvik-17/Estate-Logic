@@ -19,6 +19,8 @@ import { showMessageSent } from '../../lib/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts } from '../../theme/typography';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
+import { RateLimitedIconButton } from '../../components/RateLimitedIconButton';
 
 export default function IssueMessagesScreen({ navigation, route }) {
   const { colors } = useTheme();
@@ -222,9 +224,9 @@ export default function IssueMessagesScreen({ navigation, route }) {
             <MaterialIcons name="error-outline" size={40} color={colors.error} />
             <Text style={styles.errorTitle}>Could not load messages</Text>
             <Text style={styles.errorMsg}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={fetchMessages}>
+            <RateLimitedButton style={styles.retryBtn} onPress={fetchMessages}>
               <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
+            </RateLimitedButton>
           </View>
         ) : (
           <FlatList
@@ -269,15 +271,14 @@ export default function IssueMessagesScreen({ navigation, route }) {
             onSubmitEditing={handleSend}
             blurOnSubmit={false}
           />
-          <TouchableOpacity
+          <RateLimitedIconButton
             style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
             onPress={handleSend}
             disabled={!text.trim() || sending}
-          >
-            {sending
+            icon={sending
               ? <ActivityIndicator size="small" color={colors.onPrimary} />
               : <MaterialIcons name="send" size={20} color={colors.onPrimary} />}
-          </TouchableOpacity>
+          />
         </View>
       </View>
     </KeyboardAvoidingView>

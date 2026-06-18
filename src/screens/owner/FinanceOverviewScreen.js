@@ -17,6 +17,7 @@ import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import SectionHeader from '../../components/SectionHeader';
 import MetricCard from '../../components/MetricCard';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 const EXPENSE_CATEGORIES = ['maintenance', 'staff', 'utilities', 'repair', 'admin', 'other'];
 const REVENUE_CATEGORIES = ['residential', 'commercial', 'parking'];
@@ -137,9 +138,9 @@ export default function FinanceOverviewScreen({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load finances</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }

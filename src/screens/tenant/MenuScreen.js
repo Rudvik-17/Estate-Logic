@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function MenuScreen({ navigation }) {
   const { colors, theme, toggleTheme } = useTheme();
@@ -256,7 +257,7 @@ export default function MenuScreen({ navigation }) {
 
         {/* Logout button at the very bottom */}
         <View style={styles.logoutSection}>
-          <TouchableOpacity
+          <RateLimitedButton
             style={styles.menuRow}
             onPress={handleSignOut}
             disabled={signingOut}
@@ -266,7 +267,7 @@ export default function MenuScreen({ navigation }) {
             <Text style={[styles.menuLabel, { color: colors.error }]}>
               {signingOut ? 'Logging out…' : 'Logout'}
             </Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
       </ScrollView>
     </View>

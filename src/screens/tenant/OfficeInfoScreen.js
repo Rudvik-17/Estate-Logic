@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function OfficeInfoScreen({ navigation }) {
   const { colors } = useTheme();
@@ -118,7 +119,7 @@ export default function OfficeInfoScreen({ navigation }) {
           </View>
 
           {ownerInfo?.phone ? (
-            <TouchableOpacity style={styles.infoRow} onPress={handleCall}>
+            <RateLimitedButton style={styles.infoRow} onPress={handleCall}>
               <View style={styles.iconContainer}>
                 <MaterialIcons name="phone" size={20} color={colors.primary} />
               </View>
@@ -126,11 +127,11 @@ export default function OfficeInfoScreen({ navigation }) {
                 <Text style={styles.label}>Phone</Text>
                 <Text style={styles.value}>{ownerInfo.phone}</Text>
               </View>
-            </TouchableOpacity>
+            </RateLimitedButton>
           ) : null}
 
           {ownerInfo?.email ? (
-            <TouchableOpacity style={styles.infoRow} onPress={handleEmail}>
+            <RateLimitedButton style={styles.infoRow} onPress={handleEmail}>
               <View style={styles.iconContainer}>
                 <MaterialIcons name="email" size={20} color={colors.primary} />
               </View>
@@ -138,7 +139,7 @@ export default function OfficeInfoScreen({ navigation }) {
                 <Text style={styles.label}>Email</Text>
                 <Text style={styles.value}>{ownerInfo.email}</Text>
               </View>
-            </TouchableOpacity>
+            </RateLimitedButton>
           ) : null}
         </View>
 
@@ -175,14 +176,14 @@ export default function OfficeInfoScreen({ navigation }) {
 
         {/* Quick Contact Actions */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionBtn, styles.callBtn]} onPress={handleCall}>
+          <RateLimitedButton style={[styles.actionBtn, styles.callBtn]} onPress={handleCall}>
             <MaterialIcons name="phone" size={20} color={colors.onPrimary} />
             <Text style={styles.actionBtnText}>Call Office</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.emailBtn]} onPress={handleEmail}>
+          </RateLimitedButton>
+          <RateLimitedButton style={[styles.actionBtn, styles.emailBtn]} onPress={handleEmail}>
             <MaterialIcons name="email" size={20} color={colors.primary} />
             <Text style={[styles.actionBtnText, { color: colors.primary }]}>Email Office</Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
       </ScrollView>
     </View>

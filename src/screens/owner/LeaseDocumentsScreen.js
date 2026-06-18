@@ -20,6 +20,7 @@ import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 import { buildLeaseAgreementHTML } from '../../lib/leaseAgreementHTML';
 
 export default function LeaseDocumentsScreen({ navigation }) {
@@ -186,7 +187,7 @@ export default function LeaseDocumentsScreen({ navigation }) {
           ) : null}
         </View>
 
-        <TouchableOpacity
+        <RateLimitedButton
           style={[styles.pdfButton, isGenerating && styles.pdfButtonDisabled]}
           onPress={() => handleSharePDF(item)}
           disabled={isGenerating}
@@ -200,7 +201,7 @@ export default function LeaseDocumentsScreen({ navigation }) {
           <Text style={styles.pdfButtonText}>
             {isGenerating ? 'Compiling PDF…' : 'Share / Download PDF'}
           </Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   };

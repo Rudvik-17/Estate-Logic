@@ -36,6 +36,71 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const rawIp = req.headers.get('x-forwarded-for');
+  const ip = rawIp ? rawIp.split(',')[0].trim() : 'unknown';
+  const key = `razorpay:${ip}`;
+  
+  const now = new Date();
+  const limit = 5; // Razorpay payment function gets limit of 5 per minute
+  const windowMs = 60000;
+  
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+  let isLimited = false;
+  let retryAfter = 60;
+
+  try {
+    const { data: record, error: recordError } = await supabaseAdmin
+      .from('rate_limits')
+      .select('count, reset_at')
+      .eq('id', key)
+      .maybeSingle();
+
+    if (recordError) {
+      console.error('Database rate limit check error:', recordError.message);
+    }
+
+    const resetAtDate = record ? new Date(record.reset_at) : null;
+    const isExpired = !resetAtDate || resetAtDate.getTime() <= now.getTime();
+
+    if (record && !isExpired && record.count >= limit) {
+      isLimited = true;
+      retryAfter = Math.ceil((resetAtDate.getTime() - now.getTime()) / 1000);
+    } else {
+      if (record && !isExpired) {
+        const { error: updateError } = await supabaseAdmin
+          .from('rate_limits')
+          .update({ count: record.count + 1 })
+          .eq('id', key);
+        if (updateError) {
+          console.error('Database rate limit update error:', updateError.message);
+        }
+      } else {
+        const resetAt = new Date(now.getTime() + windowMs).toISOString();
+        const { error: upsertError } = await supabaseAdmin
+          .from('rate_limits')
+          .upsert({ id: key, count: 1, reset_at: resetAt });
+        if (upsertError) {
+          console.error('Database rate limit upsert error:', upsertError.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Rate limit logic error:', err.message);
+  }
+
+  if (isLimited) {
+    return new Response(JSON.stringify({
+      error: "Too many requests. Please try again later.",
+      retryAfter: retryAfter > 0 ? retryAfter : 60
+    }), {
+      status: 429,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
     const { action, ...payload } = await req.json();
 

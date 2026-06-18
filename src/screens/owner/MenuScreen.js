@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function MenuScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -165,16 +166,16 @@ export default function MenuScreen({ navigation }) {
 
         {/* Switch Role and Logout */}
         <View style={styles.bottomSection}>
-          <TouchableOpacity
+          <RateLimitedButton
             style={styles.menuRow}
             onPress={handleSwitchRole}
             activeOpacity={0.7}
           >
             <MaterialIcons name="swap-horiz" size={22} color={colors.primary} />
             <Text style={[styles.menuLabel, { color: colors.primary }]}>Switch Role</Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
 
-          <TouchableOpacity
+          <RateLimitedButton
             style={styles.menuRow}
             onPress={handleSignOut}
             disabled={signingOut}
@@ -184,7 +185,7 @@ export default function MenuScreen({ navigation }) {
             <Text style={[styles.menuLabel, { color: colors.error }]}>
               {signingOut ? 'Logging out…' : 'Sign Out'}
             </Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
       </ScrollView>
     </View>

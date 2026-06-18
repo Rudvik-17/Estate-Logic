@@ -21,6 +21,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import SectionHeader from '../../components/SectionHeader';
 import StatusChip from '../../components/StatusChip';
 import MetricCard from '../../components/MetricCard';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 const PRIORITY_FILTERS = [
   { key: 'all', label: 'All', icon: 'list' },
@@ -222,13 +223,13 @@ export default function ResidentIssuesScreen({ navigation }) {
         {/* Actions */}
         {item.status !== 'resolved' ? (
           <View style={styles.actionRow}>
-            <TouchableOpacity
+            <RateLimitedButton
               style={styles.actionBtn}
               onPress={() => markResolved(item.id)}
             >
               <MaterialIcons name="check-circle" size={14} color={colors.onTertiaryContainer} />
               <Text style={[styles.actionText, { color: colors.onTertiaryContainer }]}>Mark Resolved</Text>
-            </TouchableOpacity>
+            </RateLimitedButton>
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => navigation.navigate('IssueMessages', {
@@ -279,9 +280,9 @@ export default function ResidentIssuesScreen({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load issues</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchIssues}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchIssues}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }

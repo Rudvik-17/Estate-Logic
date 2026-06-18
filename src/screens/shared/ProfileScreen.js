@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 const APP_VERSION = '1.0.0';
 
@@ -99,7 +99,7 @@ export default function ProfileScreen() {
 
         {/* Actions */}
         <View style={styles.actionsSection}>
-          <TouchableOpacity style={styles.actionRow} onPress={handleSwitchRole}>
+          <RateLimitedButton style={styles.actionRow} onPress={handleSwitchRole}>
             <View style={[styles.actionIconBg, { backgroundColor: colors.surfaceContainerLow }]}>
               <Text style={styles.actionIcon}>⇄</Text>
             </View>
@@ -108,12 +108,12 @@ export default function ProfileScreen() {
               <Text style={styles.actionSub}>Change between Owner and Tenant</Text>
             </View>
             <Text style={styles.actionChevron}>›</Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
 
         {/* Sign out */}
         <View style={styles.signOutSection}>
-          <TouchableOpacity
+          <RateLimitedButton
             style={styles.signOutBtn}
             onPress={handleSignOut}
             disabled={signingOut}
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
             <Text style={styles.signOutText}>
               {signingOut ? 'Signing out…' : 'Sign Out'}
             </Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
 
         {/* Version */}
