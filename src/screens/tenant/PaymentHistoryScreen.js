@@ -25,6 +25,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
 import PrimaryButton from '../../components/PrimaryButton';
 import { buildReceiptHTML } from '../../lib/receiptHTML';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 const METHOD_LABELS = {
   gpay: 'Google Pay',
@@ -377,9 +378,9 @@ export default function PaymentHistoryScreen({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load payments</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }
@@ -417,22 +418,12 @@ export default function PaymentHistoryScreen({ navigation }) {
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[
-                styles.heroPrimaryBtn, 
-                !pendingPayment && styles.heroPrimaryBtnDisabled
-              ]}
+              style={styles.heroPrimaryBtn}
               onPress={() => {
-                if (pendingPayment) {
-                  navigation.navigate('RentPayment');
-                } else {
-                  Alert.alert('No Balance Due', 'You are completely caught up on your rent payments!');
-                }
+                navigation.navigate('RentPayment');
               }}
             >
-              <Text style={[
-                styles.heroPrimaryBtnText,
-                !pendingPayment && styles.heroPrimaryBtnTextDisabled
-              ]}>
+              <Text style={styles.heroPrimaryBtnText}>
                 Make Payment
               </Text>
             </TouchableOpacity>
@@ -492,7 +483,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                     </View>
                     <View style={styles.paidActions}>
                       <StatusChip label="paid" variant="active" />
-                      <TouchableOpacity
+                      <RateLimitedButton
                         style={styles.receiptBtn}
                         onPress={() => handleDownloadReceipt(item)}
                         disabled={downloadingIds.has(item.id)}
@@ -502,7 +493,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                         ) : (
                           <MaterialIcons name="receipt" size={16} color={colors.primary} />
                         )}
-                      </TouchableOpacity>
+                      </RateLimitedButton>
                     </View>
                   </View>
                 ))
@@ -659,12 +650,12 @@ export default function PaymentHistoryScreen({ navigation }) {
                       {method.is_active && (
                         <MaterialIcons name="check-circle" size={20} color={colors.tertiaryFixedDim} />
                       )}
-                      <TouchableOpacity 
+                      <RateLimitedButton 
                         style={styles.walletDeleteBtn}
                         onPress={() => handleDeleteMethod(method.id)}
                       >
                         <MaterialIcons name="delete" size={18} color={colors.error} />
-                      </TouchableOpacity>
+                      </RateLimitedButton>
                     </View>
                   </TouchableOpacity>
                 ))
@@ -710,9 +701,9 @@ export default function PaymentHistoryScreen({ navigation }) {
                         autoCapitalize="none"
                         autoCorrect={false}
                       />
-                      <TouchableOpacity style={styles.saveAddBtn} onPress={handleAddUpi}>
+                      <RateLimitedButton style={styles.saveAddBtn} onPress={handleAddUpi}>
                         <Text style={styles.saveAddBtnText}>Save UPI ID</Text>
-                      </TouchableOpacity>
+                      </RateLimitedButton>
                     </View>
                   ) : (
                     <View style={styles.inputGroup}>
@@ -740,9 +731,9 @@ export default function PaymentHistoryScreen({ navigation }) {
                         value={newCardExpiry}
                         onChangeText={setNewCardExpiry}
                       />
-                      <TouchableOpacity style={styles.saveAddBtn} onPress={handleAddCard}>
+                      <RateLimitedButton style={styles.saveAddBtn} onPress={handleAddCard}>
                         <Text style={styles.saveAddBtnText}>Save Card Details</Text>
-                      </TouchableOpacity>
+                      </RateLimitedButton>
                     </View>
                   )}
 
@@ -803,7 +794,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                   ) : (
                     <View style={styles.methodSelectRow}>
                       {storedMethods.map((m) => (
-                        <TouchableOpacity
+                        <RateLimitedButton
                           key={m.id}
                           style={[
                             styles.methodRadioBtn,
@@ -819,7 +810,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                           >
                             {m.label} ({m.value.slice(-8)})
                           </Text>
-                        </TouchableOpacity>
+                        </RateLimitedButton>
                       ))}
                     </View>
                   )}
@@ -828,7 +819,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                   <Text style={styles.settingsLabel}>Deduction Day of Month</Text>
                   <View style={styles.daySelectorRow}>
                     {[1, 3, 5, 7, 10].map((d) => (
-                      <TouchableOpacity
+                      <RateLimitedButton
                         key={d}
                         style={[
                           styles.dayBtn,
@@ -844,7 +835,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                         >
                           {d}th
                         </Text>
-                      </TouchableOpacity>
+                      </RateLimitedButton>
                     ))}
                   </View>
 

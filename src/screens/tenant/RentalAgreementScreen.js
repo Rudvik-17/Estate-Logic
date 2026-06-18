@@ -20,6 +20,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import PrimaryButton from '../../components/PrimaryButton';
 import StatusChip from '../../components/StatusChip';
 import { buildLeaseAgreementHTML } from '../../lib/leaseAgreementHTML';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 const CLAUSES = [
   {
@@ -164,9 +165,9 @@ export default function RentalAgreementScreen({ navigation, route }) {
         <MaterialIcons name="description" size={40} color={colors.outline} />
         <Text style={styles.errorTitle}>No agreement on file</Text>
         <Text style={styles.errorMsg}>{error ?? 'Your lease agreement is not yet available.'}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchLease}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchLease}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }
@@ -258,7 +259,7 @@ export default function RentalAgreementScreen({ navigation, route }) {
               <Text style={styles.signedText}>Agreement Signed</Text>
             </View>
           )}
-          <TouchableOpacity
+          <RateLimitedButton
             style={[styles.downloadBtn, downloading && styles.downloadBtnDisabled]}
             onPress={handleDownload}
             disabled={downloading}
@@ -271,7 +272,7 @@ export default function RentalAgreementScreen({ navigation, route }) {
             <Text style={styles.downloadText}>
               {downloading ? 'Generating PDF…' : 'Download PDF'}
             </Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
       </ScrollView>
     </View>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { View } from 'react-native';
 import { useFonts } from 'expo-font';
 import {
   Manrope_400Regular,
@@ -40,6 +41,10 @@ export default function App() {
     requestPermissions();
   }, []);
 
+  const handleSplashFinish = React.useCallback(() => {
+    setSplashActive(false);
+  }, []);
+
   // Hold render until fonts are ready or 3s timeout has passed.
   if (!fontsLoaded && !fontTimeout) {
     return null;
@@ -48,10 +53,12 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <RootNavigator />
-        {splashActive && (
-          <SplashAnimation onFinish={() => setSplashActive(false)} />
-        )}
+        <View style={{ flex: 1, position: 'relative' }}>
+          <RootNavigator />
+          {splashActive && (
+            <SplashAnimation onFinish={handleSplashFinish} />
+          )}
+        </View>
       </AuthProvider>
     </ThemeProvider>
   );

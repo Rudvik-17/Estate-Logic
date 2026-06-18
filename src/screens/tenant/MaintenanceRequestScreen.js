@@ -25,6 +25,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import SectionHeader from '../../components/SectionHeader';
 import StatusChip from '../../components/StatusChip';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 let caseCounter = 4903;
 
@@ -337,9 +338,9 @@ export default function MaintenanceRequestScreen({ navigation, route }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load requests</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }

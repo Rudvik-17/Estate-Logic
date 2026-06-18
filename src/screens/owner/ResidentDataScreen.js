@@ -21,6 +21,8 @@ import SectionHeader from '../../components/SectionHeader';
 import StatusChip from '../../components/StatusChip';
 import MetricCard from '../../components/MetricCard';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
+import { RateLimitedIconButton } from '../../components/RateLimitedIconButton';
 
 export default function ResidentDataScreen({ navigation }) {
   const { colors } = useTheme();
@@ -119,9 +121,9 @@ export default function ResidentDataScreen({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load residents</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchTenants}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchTenants}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }
@@ -159,12 +161,11 @@ export default function ResidentDataScreen({ navigation }) {
                   placeholderTextColor={colors.outline}
                 />
               </View>
-              <TouchableOpacity
+              <RateLimitedIconButton
                 style={styles.addBtn}
                 onPress={() => navigation.navigate('TenantOnboarding')}
-              >
-                <MaterialIcons name="person-add" size={20} color={colors.onPrimary} />
-              </TouchableOpacity>
+                icon={<MaterialIcons name="person-add" size={20} color={colors.onPrimary} />}
+              />
             </View>
 
             <SectionHeader

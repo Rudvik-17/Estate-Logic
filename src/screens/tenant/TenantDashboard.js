@@ -23,7 +23,8 @@ import { buildLeaseAgreementHTML } from '../../lib/leaseAgreementHTML';
 import ScreenHeader from '../../components/ScreenHeader';
 import SectionHeader from '../../components/SectionHeader';
 import StatusChip from '../../components/StatusChip';
-import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
+import { RateLimitedIconButton } from '../../components/RateLimitedIconButton';
 
 export default function TenantDashboard({ navigation }) {
   const { colors } = useTheme();
@@ -207,9 +208,9 @@ export default function TenantDashboard({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Something went wrong</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }
@@ -265,13 +266,13 @@ export default function TenantDashboard({ navigation }) {
             )}
           </View>
           
-          <TouchableOpacity
+          <RateLimitedButton
             style={styles.makePaymentBtn}
             onPress={() => navigation.getParent().navigate('Payments', { screen: 'RentPayment' })}
             activeOpacity={0.8}
           >
             <Text style={styles.makePaymentBtnText}>Make Payment</Text>
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
 
         {/* Quick Links Section */}
@@ -280,7 +281,7 @@ export default function TenantDashboard({ navigation }) {
           <View style={styles.quickLinksRow}>
             {/* Link 1: Request Maintenance */}
             <View style={styles.quickLinkItem}>
-              <TouchableOpacity
+              <RateLimitedButton
                 style={styles.quickLinkCircle}
                 onPress={() => {
                   navigation.navigate('Maintenance', {
@@ -291,7 +292,7 @@ export default function TenantDashboard({ navigation }) {
                 activeOpacity={0.7}
               >
                 <MaterialIcons name="build" size={26} color={colors.onPrimary} />
-              </TouchableOpacity>
+              </RateLimitedButton>
               <Text style={styles.quickLinkLabel} numberOfLines={2}>
                 Request{'\n'}Maintenance
               </Text>
@@ -299,13 +300,13 @@ export default function TenantDashboard({ navigation }) {
 
             {/* Link 2: Contact Us */}
             <View style={styles.quickLinkItem}>
-              <TouchableOpacity
+              <RateLimitedButton
                 style={styles.quickLinkCircle}
                 onPress={handleContactPress}
                 activeOpacity={0.7}
               >
                 <MaterialIcons name="smartphone" size={26} color={colors.onPrimary} />
-              </TouchableOpacity>
+              </RateLimitedButton>
               <Text style={styles.quickLinkLabel} numberOfLines={2}>
                 Contact Us
               </Text>
@@ -313,13 +314,13 @@ export default function TenantDashboard({ navigation }) {
 
             {/* Link 3: View Documents */}
             <View style={styles.quickLinkItem}>
-              <TouchableOpacity
+              <RateLimitedButton
                 style={styles.quickLinkCircle}
                 onPress={handleViewDocumentsPress}
                 activeOpacity={0.7}
               >
                 <MaterialIcons name="description" size={26} color={colors.onPrimary} />
-              </TouchableOpacity>
+              </RateLimitedButton>
               <Text style={styles.quickLinkLabel} numberOfLines={2}>
                 View{'\n'}Documents
               </Text>
@@ -361,11 +362,14 @@ export default function TenantDashboard({ navigation }) {
                   Signed {lease.signed_at ? formatDate(lease.signed_at) : 'Pending signature'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={handleLeaseDownload} disabled={downloading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                {downloading
+              <RateLimitedIconButton
+                onPress={handleLeaseDownload}
+                disabled={downloading}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                icon={downloading
                   ? <ActivityIndicator size="small" color={colors.primary} />
                   : <MaterialIcons name="download" size={20} color={colors.primary} />}
-              </TouchableOpacity>
+              />
             </View>
           ) : (
             <Text style={styles.noDocText}>No documents on file</Text>

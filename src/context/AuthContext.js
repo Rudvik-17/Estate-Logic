@@ -10,21 +10,35 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) fetchRole(session.user.id);
-      else setLoading(false);
+      if (session?.user) {
+        setLoading(true);
+        setUser(session.user);
+        const handleInitialSession = async () => {
+          await linkTenantIfNeeded(session.user);
+          await fetchRole(session.user.id);
+        };
+        handleInitialSession();
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
       if (session?.user) {
-        // On sign-in or initial session restore, silently link any unlinked
-        // tenant row whose email matches this user's auth email.
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-          linkTenantIfNeeded(session.user);
-        }
-        fetchRole(session.user.id);
+        setLoading(true);
+        setUser(session.user);
+        
+        const handleAuthSession = async () => {
+          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+            await linkTenantIfNeeded(session.user);
+          }
+          await fetchRole(session.user.id);
+        };
+        
+        handleAuthSession();
       } else {
+        setUser(null);
         setRole(null);
         setLoading(false);
       }
@@ -45,14 +59,26 @@ export const AuthProvider = ({ children }) => {
       .is('user_id', null)
       .limit(1);
     if (data?.[0]) {
+      // 1. Link tenant row to user
       await supabase
         .from('tenants')
         .update({ user_id: authUser.id, status: 'active' })
         .eq('id', data[0].id);
+
+      // 2. Auto-set role to 'tenant' in users table
+      await supabase
+        .from('users')
+        .upsert({
+          id: authUser.id,
+          role: 'tenant',
+          full_name: authUser.user_metadata?.full_name || '',
+          email: authUser.email || ''
+        }, { onConflict: 'id' });
     }
   };
 
   const fetchRole = async (userId) => {
+    setLoading(true);
     const { data } = await supabase
       .from('users')
       .select('role')

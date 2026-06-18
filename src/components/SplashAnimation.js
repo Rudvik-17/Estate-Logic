@@ -21,6 +21,12 @@ export default function SplashAnimation({ onFinish }) {
   const textTranslateY = useRef(new Animated.Value(20)).current;
   const splashOpacity = useRef(new Animated.Value(1)).current;
 
+  const onFinishRef = useRef(onFinish);
+
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
+
   useEffect(() => {
     // Run animations in sequence and parallel
     Animated.sequence([
@@ -72,11 +78,11 @@ export default function SplashAnimation({ onFinish }) {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      if (onFinish) {
-        onFinish();
+      if (onFinishRef.current) {
+        onFinishRef.current();
       }
     });
-  }, [glowOpacity, glowScale, logoScale, logoRotate, textOpacity, textTranslateY, splashOpacity, onFinish]);
+  }, []);
 
   // Interpolate rotation
   const spin = logoRotate.interpolate({
@@ -136,11 +142,16 @@ export default function SplashAnimation({ onFinish }) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#0C0B14', // Sleek dark mode background
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 99999,
+    elevation: 99999,
   },
   glow: {
     position: 'absolute',

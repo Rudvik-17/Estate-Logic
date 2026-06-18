@@ -19,6 +19,7 @@ import MetricCard from '../../components/MetricCard';
 import SectionHeader from '../../components/SectionHeader';
 import ScreenHeader from '../../components/ScreenHeader';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function OwnerDashboard({ navigation }) {
   const { colors } = useTheme();
@@ -140,9 +141,9 @@ export default function OwnerDashboard({ navigation }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load dashboard</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }

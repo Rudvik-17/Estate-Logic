@@ -17,6 +17,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function PropertyDetailScreen({ navigation, route }) {
   const { colors } = useTheme();
@@ -119,9 +120,9 @@ export default function PropertyDetailScreen({ navigation, route }) {
         <MaterialIcons name="error-outline" size={40} color={colors.error} />
         <Text style={styles.errorTitle}>Unable to load property</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
+        <RateLimitedButton style={styles.retryBtn} onPress={fetchData}>
           <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        </RateLimitedButton>
       </View>
     );
   }
@@ -234,7 +235,7 @@ export default function PropertyDetailScreen({ navigation, route }) {
             <Text style={styles.editBtnText}>Edit Property</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <RateLimitedButton
             style={styles.deleteBtn}
             onPress={handleDeleteProperty}
             disabled={deleting}
@@ -247,7 +248,7 @@ export default function PropertyDetailScreen({ navigation, route }) {
                 <Text style={styles.deleteBtnText}>Delete Property</Text>
               </>
             )}
-          </TouchableOpacity>
+          </RateLimitedButton>
         </View>
       </ScrollView>
     </View>

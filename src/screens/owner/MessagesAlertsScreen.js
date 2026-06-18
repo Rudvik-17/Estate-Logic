@@ -21,6 +21,7 @@ import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
 import PrimaryButton from '../../components/PrimaryButton';
+import { RateLimitedIconButton } from '../../components/RateLimitedIconButton';
 
 export default function MessagesAlertsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -221,13 +222,12 @@ export default function MessagesAlertsScreen({ navigation }) {
             variant={getAlertVariant(item.type)}
           />
         </View>
-        <TouchableOpacity
+        <RateLimitedIconButton
           style={styles.deleteBtn}
           onPress={() => handleDeleteAlert(item.id)}
           activeOpacity={0.7}
-        >
-          <MaterialIcons name="delete-outline" size={20} color={colors.error} />
-        </TouchableOpacity>
+          icon={<MaterialIcons name="delete-outline" size={20} color={colors.error} />}
+        />
       </View>
 
       <Text style={styles.titleText}>{item.title}</Text>

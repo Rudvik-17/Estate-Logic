@@ -14,6 +14,7 @@ import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import ScreenHeader from '../../components/ScreenHeader';
 import SectionHeader from '../../components/SectionHeader';
+import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function ShipPlayScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -134,14 +135,14 @@ export default function ShipPlayScreen({ navigation }) {
                   <Text style={styles.partnerName}>{item.name}</Text>
                 </View>
                 <Text style={styles.partnerDesc}>{item.desc}</Text>
-                <TouchableOpacity
+                <RateLimitedButton
                   style={styles.partnerActionBtn}
                   onPress={() => handlePartnerAction(item.link, item.name)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.partnerActionBtnText}>{item.action}</Text>
                   <MaterialIcons name="arrow-forward" size={16} color={colors.primary} />
-                </TouchableOpacity>
+                </RateLimitedButton>
               </View>
             ))}
           </View>
