@@ -26,6 +26,16 @@ import StatusChip from '../../components/StatusChip';
 import { RateLimitedButton } from '../../components/RateLimitedButton';
 import { RateLimitedIconButton } from '../../components/RateLimitedIconButton';
 
+// DocuSign status → display config
+const DOCUSIGN_STATUS_CONFIG = {
+  not_sent: { label: 'Not Sent', variant: 'pending', icon: 'schedule' },
+  sent: { label: 'Awaiting Signature', variant: 'pending', icon: 'send' },
+  delivered: { label: 'Ready to Sign', variant: 'pending', icon: 'mark-email-unread' },
+  completed: { label: 'Signed', variant: 'active', icon: 'verified' },
+  declined: { label: 'Declined', variant: 'urgent', icon: 'cancel' },
+  voided: { label: 'Voided', variant: 'urgent', icon: 'block' },
+};
+
 export default function TenantDashboard({ navigation }) {
   const { colors } = useTheme();
   const styles = getStyles(colors);
@@ -354,22 +364,68 @@ export default function TenantDashboard({ navigation }) {
         <View style={styles.section}>
           <SectionHeader title="Documents" />
           {lease ? (
-            <View style={styles.docRow}>
-              <MaterialIcons name="picture-as-pdf" size={24} color={colors.error} />
-              <View style={styles.docInfo}>
-                <Text style={styles.docName}>Lease_Agreement.pdf</Text>
-                <Text style={styles.docMeta}>
-                  Signed {lease.signed_at ? formatDate(lease.signed_at) : 'Pending signature'}
-                </Text>
+            <View style={styles.docCard}>
+              <View style={styles.docRow}>
+                <MaterialIcons name="picture-as-pdf" size={24} color={colors.error} />
+                <View style={styles.docInfo}>
+                  <Text style={styles.docName}>Lease_Agreement.pdf</Text>
+                  <Text style={styles.docMeta}>
+                    Signed {lease.signed_at ? formatDate(lease.signed_at) : 'Pending signature'}
+                  </Text>
+                </View>
+                <RateLimitedIconButton
+                  onPress={handleLeaseDownload}
+                  disabled={downloading}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  icon={downloading
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <MaterialIcons name="download" size={20} color={colors.primary} />}
+                />
               </View>
-              <RateLimitedIconButton
-                onPress={handleLeaseDownload}
-                disabled={downloading}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                icon={downloading
-                  ? <ActivityIndicator size="small" color={colors.primary} />
-                  : <MaterialIcons name="download" size={20} color={colors.primary} />}
-              />
+
+              {/* DocuSign Status Badge */}
+              {lease.docusign_status && lease.docusign_status !== 'not_sent' ? (
+                <View style={styles.docusignRow}>
+                  <MaterialIcons
+                    name={DOCUSIGN_STATUS_CONFIG[lease.docusign_status]?.icon || 'info'}
+                    size={16}
+                    color={lease.docusign_status === 'completed' ? colors.tertiaryFixedDim : colors.secondary}
+                  />
+                  <StatusChip
+                    label={DOCUSIGN_STATUS_CONFIG[lease.docusign_status]?.label || lease.docusign_status}
+                    variant={DOCUSIGN_STATUS_CONFIG[lease.docusign_status]?.variant || 'pending'}
+                  />
+                </View>
+              ) : null}
+
+              {/* Sign Now Button — visible when DocuSign envelope is sent or delivered */}
+              {lease.docusign_status === 'sent' || lease.docusign_status === 'delivered' ? (
+                <RateLimitedButton
+                  style={styles.signNowBtn}
+                  onPress={() => {
+                    Alert.alert(
+                      'Sign Your Lease',
+                      'Check your email for a message from DocuSign to sign your lease agreement. Look for the subject line "Please sign your lease agreement - Tenura".',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Open Email',
+                          onPress: () => {
+                            const email = tenantProfile?.email || '';
+                            Linking.openURL(`mailto:${email}`).catch(() => {
+                              Alert.alert('Error', 'Could not open email app.');
+                            });
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="draw" size={18} color={colors.onPrimary} />
+                  <Text style={styles.signNowBtnText}>Sign Now</Text>
+                </RateLimitedButton>
+              ) : null}
             </View>
           ) : (
             <Text style={styles.noDocText}>No documents on file</Text>
@@ -517,6 +573,32 @@ const getStyles = (colors) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: 12, padding: 14,
+  },
+  docCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  docusignRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 4,
+  },
+  signNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  signNowBtnText: {
+    fontFamily: fonts.interSemiBold,
+    fontSize: 14,
+    color: colors.onPrimary,
   },
   docInfo: { flex: 1 },
   docName: { fontFamily: fonts.interSemiBold, fontSize: 14, color: colors.onSurface, marginBottom: 2 },
