@@ -14,6 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
@@ -22,6 +23,16 @@ import ScreenHeader from '../../components/ScreenHeader';
 import StatusChip from '../../components/StatusChip';
 import { RateLimitedButton } from '../../components/RateLimitedButton';
 import { buildLeaseAgreementHTML } from '../../lib/leaseAgreementHTML';
+
+// DocuSign status → display config
+const DOCUSIGN_STATUS_CONFIG = {
+  not_sent: { label: 'Not Sent', bg: '#e0e0e0', text: '#616161' },
+  sent: { label: 'Sent for Signing', bg: '#FFF3E0', text: '#E65100' },
+  delivered: { label: 'Delivered', bg: '#FFF3E0', text: '#E65100' },
+  completed: { label: 'Signed ✓', bg: 'rgba(104, 219, 169, 0.15)', text: '#1B5E20' },
+  declined: { label: 'Declined', bg: '#FFEBEE', text: '#B71C1C' },
+  voided: { label: 'Voided', bg: '#FFEBEE', text: '#B71C1C' },
+};
 
 export default function LeaseDocumentsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -35,6 +46,7 @@ export default function LeaseDocumentsScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [ownerName, setOwnerName] = useState('');
   const [generatingPdfId, setGeneratingPdfId] = useState(null);
+  const [sendingDocusignId, setSendingDocusignId] = useState(null);
 
   const fetchLeasesAndOwner = useCallback(async () => {
     if (!user) return;
@@ -63,7 +75,8 @@ export default function LeaseDocumentsScreen({ navigation }) {
           tenants (
             id,
             full_name,
-            unit_number
+            unit_number,
+            email
           )
         `)
         .order('created_at', { ascending: false });
@@ -146,11 +159,91 @@ export default function LeaseDocumentsScreen({ navigation }) {
     }
   };
 
+  const handleSendForSignature = async (lease) => {
+    if (!lease) return;
+    const tenant = lease.tenants;
+    if (!tenant?.email) {
+      Alert.alert('Missing Email', 'This tenant does not have an email address on file. Please add one before sending for signature.');
+      return;
+    }
+
+    Alert.alert(
+      'Send for Signature',
+      `Send this lease agreement to ${tenant.full_name} (${tenant.email}) via DocuSign?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: async () => {
+            setSendingDocusignId(lease.id);
+            try {
+              // Generate PDF as base64
+              const property = lease.properties;
+              const html = buildLeaseAgreementHTML({
+                landlordName: ownerName || 'Landlord',
+                tenantName: tenant.full_name || 'Tenant',
+                propertyName: property?.name || 'Property',
+                propertyAddress: property ? `${property.address}, ${property.city}` : '—',
+                unitNumber: tenant.unit_number || '—',
+                monthlyRent: lease.monthly_rent,
+                startDate: lease.start_date,
+                endDate: lease.end_date,
+                securityDeposit: null,
+                agreementDate: lease.signed_at || lease.start_date,
+              });
+
+              const { uri } = await Print.printToFileAsync({ html, base64: false });
+              const base64Content = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+
+              // Call the Edge Function
+              const { data, error: fnError } = await supabase.functions.invoke('send-for-signature', {
+                body: {
+                  leaseId: lease.id,
+                  tenantEmail: tenant.email,
+                  tenantName: tenant.full_name,
+                  landlordName: ownerName || 'Landlord',
+                  pdfBase64: base64Content,
+                },
+              });
+
+              if (fnError) {
+                let errorMsg = fnError.message;
+                try {
+                  const errorBody = await fnError.context.json();
+                  if (errorBody && errorBody.error) {
+                    errorMsg = errorBody.error;
+                  }
+                } catch (_) {}
+                throw new Error(errorMsg);
+              }
+              if (data?.error) throw new Error(data.error);
+
+              Alert.alert('Success', `Lease sent to ${tenant.full_name} for signing via DocuSign!`);
+              fetchLeasesAndOwner(); // Refresh to show updated status
+            } catch (err) {
+              console.error('DocuSign send error:', err.message);
+              Alert.alert('Error', `Could not send for signature: ${err.message}`);
+            } finally {
+              setSendingDocusignId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatDate = (d) =>
     new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const renderLease = ({ item }) => {
     const isGenerating = generatingPdfId === item.id;
+    const isSendingDocusign = sendingDocusignId === item.id;
+    const dsStatus = item.docusign_status || 'not_sent';
+    const dsConfig = DOCUSIGN_STATUS_CONFIG[dsStatus] || DOCUSIGN_STATUS_CONFIG.not_sent;
+    const canSendForSignature = dsStatus === 'not_sent' && item.tenants?.email;
+
     return (
       <View style={styles.leaseCard}>
         <View style={styles.cardHeader}>
@@ -160,10 +253,22 @@ export default function LeaseDocumentsScreen({ navigation }) {
               Unit {item.tenants?.unit_number || 'N/A'} · {item.properties?.name || 'Property'}
             </Text>
           </View>
-          <StatusChip
-            label={item.status}
-            variant={item.status === 'active' ? 'active' : item.status === 'pending_signature' ? 'pending' : 'urgent'}
-          />
+          <View style={styles.badgeColumn}>
+            <StatusChip
+              label={item.status}
+              variant={item.status === 'active' ? 'active' : item.status === 'pending_signature' ? 'pending' : 'urgent'}
+            />
+            <View style={[styles.docusignBadge, { backgroundColor: dsConfig.bg }]}>
+              <MaterialIcons
+                name={dsStatus === 'completed' ? 'verified' : dsStatus === 'not_sent' ? 'schedule' : 'send'}
+                size={11}
+                color={dsConfig.text}
+              />
+              <Text style={[styles.docusignBadgeText, { color: dsConfig.text }]}>
+                {dsConfig.label}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.detailsList}>
@@ -185,23 +290,55 @@ export default function LeaseDocumentsScreen({ navigation }) {
               <Text style={styles.detailValue}>{formatDate(item.signed_at)}</Text>
             </View>
           ) : null}
+          {item.docusign_sent_at ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Sent for Signing</Text>
+              <Text style={styles.detailValue}>{formatDate(item.docusign_sent_at)}</Text>
+            </View>
+          ) : null}
+          {item.docusign_signed_at ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>DocuSign Signed</Text>
+              <Text style={styles.detailValue}>{formatDate(item.docusign_signed_at)}</Text>
+            </View>
+          ) : null}
         </View>
 
-        <RateLimitedButton
-          style={[styles.pdfButton, isGenerating && styles.pdfButtonDisabled]}
-          onPress={() => handleSharePDF(item)}
-          disabled={isGenerating}
-          activeOpacity={0.8}
-        >
-          {isGenerating ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <MaterialIcons name="share" size={18} color={colors.primary} />
-          )}
-          <Text style={styles.pdfButtonText}>
-            {isGenerating ? 'Compiling PDF…' : 'Share / Download PDF'}
-          </Text>
-        </RateLimitedButton>
+        <View style={styles.buttonRow}>
+          <RateLimitedButton
+            style={[styles.pdfButton, styles.pdfButtonFlex, isGenerating && styles.pdfButtonDisabled]}
+            onPress={() => handleSharePDF(item)}
+            disabled={isGenerating}
+            activeOpacity={0.8}
+          >
+            {isGenerating ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <MaterialIcons name="share" size={18} color={colors.primary} />
+            )}
+            <Text style={styles.pdfButtonText}>
+              {isGenerating ? 'Compiling…' : 'Share PDF'}
+            </Text>
+          </RateLimitedButton>
+
+          {canSendForSignature ? (
+            <RateLimitedButton
+              style={[styles.docusignButton, isSendingDocusign && styles.pdfButtonDisabled]}
+              onPress={() => handleSendForSignature(item)}
+              disabled={isSendingDocusign}
+              activeOpacity={0.8}
+            >
+              {isSendingDocusign ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <MaterialIcons name="send" size={16} color="#FFFFFF" />
+              )}
+              <Text style={styles.docusignButtonText}>
+                {isSendingDocusign ? 'Sending…' : 'Send for Signature'}
+              </Text>
+            </RateLimitedButton>
+          ) : null}
+        </View>
       </View>
     );
   };
@@ -344,6 +481,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.onSurface,
   },
+  badgeColumn: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  docusignBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 9999,
+  },
+  docusignBadgeText: {
+    fontFamily: fonts.interSemiBold,
+    fontSize: 10,
+    letterSpacing: 0.3,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,13 +512,31 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.surfaceContainerLow,
   },
+  pdfButtonFlex: {
+    flex: 1,
+  },
   pdfButtonDisabled: {
     opacity: 0.6,
   },
   pdfButtonText: {
     fontFamily: fonts.interSemiBold,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.primary,
+  },
+  docusignButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+  },
+  docusignButtonText: {
+    fontFamily: fonts.interSemiBold,
+    fontSize: 13,
+    color: '#FFFFFF',
   },
   emptyState: {
     alignItems: 'center',
