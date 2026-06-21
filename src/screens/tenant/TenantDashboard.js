@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -139,20 +140,32 @@ export default function TenantDashboard({ navigation }) {
     if (!lease || !tenantProfile) return;
     setDownloading(true);
     try {
-      const property = tenantProfile.properties;
-      const html = buildLeaseAgreementHTML({
-        landlordName: ownerName ?? 'Landlord',
-        tenantName: tenantProfile.full_name,
-        propertyName: property?.name ?? 'Property',
-        propertyAddress: property ? `${property.address}, ${property.city}` : '—',
-        unitNumber: tenantProfile.unit_number,
-        monthlyRent: lease.monthly_rent,
-        startDate: lease.start_date,
-        endDate: lease.end_date,
-        securityDeposit: null,
-        agreementDate: lease.signed_at ?? lease.start_date,
-      });
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      let uri;
+
+      if (lease.document_url) {
+        console.log('Downloading signed PDF from:', lease.document_url);
+        const filename = `Lease_Agreement_${lease.id.substring(0, 8)}.pdf`;
+        const localUri = `${FileSystem.documentDirectory}${filename}`;
+        const downloadResult = await FileSystem.downloadAsync(lease.document_url, localUri);
+        uri = downloadResult.uri;
+      } else {
+        const property = tenantProfile.properties;
+        const html = buildLeaseAgreementHTML({
+          landlordName: ownerName ?? 'Landlord',
+          tenantName: tenantProfile.full_name,
+          propertyName: property?.name ?? 'Property',
+          propertyAddress: property ? `${property.address}, ${property.city}` : '—',
+          unitNumber: tenantProfile.unit_number,
+          monthlyRent: lease.monthly_rent,
+          startDate: lease.start_date,
+          endDate: lease.end_date,
+          securityDeposit: null,
+          agreementDate: lease.signed_at ?? lease.start_date,
+        });
+        const printResult = await Print.printToFileAsync({ html, base64: false });
+        uri = printResult.uri;
+      }
+
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, {
@@ -161,8 +174,9 @@ export default function TenantDashboard({ navigation }) {
           UTI: 'com.adobe.pdf',
         });
       }
-    } catch {
-      Alert.alert('Error', 'Could not generate PDF. Please try again.');
+    } catch (err) {
+      console.error('Error sharing PDF:', err.message);
+      Alert.alert('Error', 'Could not share PDF. Please try again.');
     } finally {
       setDownloading(false);
     }

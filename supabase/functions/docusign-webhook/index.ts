@@ -7,6 +7,104 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const DOCUSIGN_INTEGRATION_KEY = Deno.env.get('DOCUSIGN_INTEGRATION_KEY') || ''
+const DOCUSIGN_ACCOUNT_ID = Deno.env.get('DOCUSIGN_ACCOUNT_ID') || ''
+const DOCUSIGN_BASE_URI = Deno.env.get('DOCUSIGN_BASE_URI') || 'https://demo.docusign.net'
+const DOCUSIGN_USER_ID = Deno.env.get('DOCUSIGN_USER_ID') || ''
+const DOCUSIGN_PRIVATE_KEY = Deno.env.get('DOCUSIGN_PRIVATE_KEY') || ''
+
+/** Base64url encode (no padding) */
+function b64url(input: Uint8Array | string): string {
+  const str = typeof input === 'string'
+    ? btoa(input)
+    : btoa(String.fromCharCode(...input))
+  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Get a DocuSign access token via JWT Bearer Grant.
+ * Uses crypto.subtle to sign with the PKCS#8 or PKCS#1 RSA private key from DocuSign.
+ */
+async function getAccessToken(): Promise<string> {
+  if (!DOCUSIGN_PRIVATE_KEY) {
+    throw new Error('DOCUSIGN_PRIVATE_KEY not configured')
+  }
+
+  // Strip PEM headers and whitespace to get raw base64 DER
+  const pemContents = DOCUSIGN_PRIVATE_KEY
+    .replace('-----BEGIN RSA PRIVATE KEY-----', '')
+    .replace('-----END RSA PRIVATE KEY-----', '')
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s/g, '')
+
+  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0))
+
+  // Import the RSA private key for signing
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+
+  // Build JWT header + payload
+  const now = Math.floor(Date.now() / 1000)
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+  const payload = b64url(JSON.stringify({
+    iss: DOCUSIGN_INTEGRATION_KEY,
+    sub: DOCUSIGN_USER_ID,
+    aud: 'account-d.docusign.com',
+    iat: now,
+    exp: now + 3600,
+    scope: 'signature impersonation',
+  }))
+
+  // Sign and assemble the JWT
+  const signingInput = new TextEncoder().encode(`${header}.${payload}`)
+  const signatureBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, signingInput)
+  const signature = b64url(new Uint8Array(signatureBuffer))
+  const assertion = `${header}.${payload}.${signature}`
+
+  // Exchange JWT for access token
+  const response = await fetch('https://account-d.docusign.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(`DocuSign auth failed: ${data.error || data.error_description || JSON.stringify(data)}`)
+  }
+
+  return data.access_token
+}
+
+/**
+ * Download signed PDF from DocuSign
+ */
+async function downloadSignedDocument(accessToken: string, envelopeId: string): Promise<Blob> {
+  const url = `${DOCUSIGN_BASE_URI}/restapi/v2.1/accounts/${DOCUSIGN_ACCOUNT_ID}/envelopes/${envelopeId}/documents/1`
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`DocuSign PDF download failed: ${response.status} ${response.statusText} - ${errorText}`)
+  }
+
+  return await response.blob()
+}
+
 /**
  * Map DocuSign envelope status strings to our internal status values.
  * DocuSign statuses: created, sent, delivered, completed, declined, voided, etc.
@@ -119,12 +217,49 @@ serve(async (req) => {
       docusign_status: mappedStatus,
     }
 
-    // If signing is completed, also mark the lease as signed and active
+    // If signing is completed, also mark the lease as signed and active, and fetch the PDF
     if (mappedStatus === 'completed') {
       const now = new Date().toISOString()
       updateData.docusign_signed_at = now
       updateData.signed_at = now
       updateData.status = 'active'
+
+      try {
+        console.log(`Downloading signed PDF from DocuSign for envelope: ${envelopeId}...`)
+        const token = await getAccessToken()
+        const pdfBlob = await downloadSignedDocument(token, envelopeId)
+        
+        console.log(`Uploading signed PDF to Supabase Storage for envelope: ${envelopeId}...`)
+        // Ensure "leases" bucket exists (safe to run, will be created if not exists)
+        await supabase.storage.createBucket('leases', {
+          public: true,
+          allowedMimeTypes: ['application/pdf']
+        })
+
+        const fileName = `${envelopeId}.pdf`
+        const { error: uploadError } = await supabase.storage
+          .from('leases')
+          .upload(fileName, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: true
+          })
+
+        if (uploadError) {
+          throw uploadError
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('leases')
+          .getPublicUrl(fileName)
+
+        if (urlData?.publicUrl) {
+          console.log(`Signed PDF uploaded successfully. Public URL: ${urlData.publicUrl}`)
+          updateData.document_url = urlData.publicUrl
+        }
+      } catch (err) {
+        console.error(`Warning: Failed to fetch/store signed PDF for envelope ${envelopeId}:`, err.message)
+      }
     }
 
     const { data, error: dbError } = await supabase

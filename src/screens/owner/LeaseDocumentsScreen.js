@@ -125,22 +125,34 @@ export default function LeaseDocumentsScreen({ navigation }) {
     if (!lease) return;
     setGeneratingPdfId(lease.id);
     try {
-      const property = lease.properties;
       const tenant = lease.tenants;
-      const html = buildLeaseAgreementHTML({
-        landlordName: ownerName || 'Landlord',
-        tenantName: tenant?.full_name || 'Tenant',
-        propertyName: property?.name || 'Property',
-        propertyAddress: property ? `${property.address}, ${property.city}` : '—',
-        unitNumber: tenant?.unit_number || '—',
-        monthlyRent: lease.monthly_rent,
-        startDate: lease.start_date,
-        endDate: lease.end_date,
-        securityDeposit: null,
-        agreementDate: lease.signed_at || lease.start_date,
-      });
+      let uri;
 
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      if (lease.document_url) {
+        console.log('Downloading signed PDF from:', lease.document_url);
+        const filename = `Lease_Agreement_${lease.id.substring(0, 8)}.pdf`;
+        const localUri = `${FileSystem.documentDirectory}${filename}`;
+        const downloadResult = await FileSystem.downloadAsync(lease.document_url, localUri);
+        uri = downloadResult.uri;
+      } else {
+        const property = lease.properties;
+        const html = buildLeaseAgreementHTML({
+          landlordName: ownerName || 'Landlord',
+          tenantName: tenant?.full_name || 'Tenant',
+          propertyName: property?.name || 'Property',
+          propertyAddress: property ? `${property.address}, ${property.city}` : '—',
+          unitNumber: tenant?.unit_number || '—',
+          monthlyRent: lease.monthly_rent,
+          startDate: lease.start_date,
+          endDate: lease.end_date,
+          securityDeposit: null,
+          agreementDate: lease.signed_at || lease.start_date,
+        });
+
+        const printResult = await Print.printToFileAsync({ html, base64: false });
+        uri = printResult.uri;
+      }
+
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, {
@@ -152,8 +164,8 @@ export default function LeaseDocumentsScreen({ navigation }) {
         Alert.alert('Sharing Unavailable', 'PDF generated, but sharing services are not available on this device.');
       }
     } catch (err) {
-      console.error('Error generating PDF:', err.message);
-      Alert.alert('Error', 'Could not generate PDF. Please try again.');
+      console.error('Error sharing PDF:', err.message);
+      Alert.alert('Error', 'Could not share PDF. Please try again.');
     } finally {
       setGeneratingPdfId(null);
     }
