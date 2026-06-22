@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -136,16 +137,32 @@ export default function PropertyDetailScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
-        <View style={styles.hero}>
-          <View style={styles.heroIconBg}>
-            <MaterialIcons name="apartment" size={32} color={colors.onPrimary} />
+        {property.image_url ? (
+          <ImageBackground
+            source={{ uri: property.image_url }}
+            style={styles.heroImageBg}
+            resizeMode="cover"
+          >
+            <View style={styles.heroOverlay}>
+              <Text style={styles.heroNameImage}>{property.name}</Text>
+              <View style={styles.heroLocationRow}>
+                <MaterialIcons name="location-on" size={13} color="#FFFFFF" style={{ opacity: 0.9 }} />
+                <Text style={styles.heroLocationImage}>{property.address}, {property.city}</Text>
+              </View>
+            </View>
+          </ImageBackground>
+        ) : (
+          <View style={styles.hero}>
+            <View style={styles.heroIconBg}>
+              <MaterialIcons name="apartment" size={32} color={colors.onPrimary} />
+            </View>
+            <Text style={styles.heroName}>{property.name}</Text>
+            <View style={styles.heroLocationRow}>
+              <MaterialIcons name="location-on" size={13} color={colors.onPrimaryContainer} style={{ opacity: 0.7 }} />
+              <Text style={styles.heroLocation}>{property.address}, {property.city}</Text>
+            </View>
           </View>
-          <Text style={styles.heroName}>{property.name}</Text>
-          <View style={styles.heroLocationRow}>
-            <MaterialIcons name="location-on" size={13} color={colors.onPrimaryContainer} style={{ opacity: 0.7 }} />
-            <Text style={styles.heroLocation}>{property.address}, {property.city}</Text>
-          </View>
-        </View>
+        )}
 
         {/* Stats strip */}
         <View style={styles.statsStrip}>
@@ -303,6 +320,35 @@ const getStyles = (colors) => StyleSheet.create({
     color: colors.onPrimaryContainer,
     opacity: 0.7,
     textAlign: 'center',
+    flexShrink: 1,
+  },
+
+  // ── Hero photo styles ───────────────────────────────────────────────────────────
+  heroImageBg: {
+    height: 200,
+    width: '100%',
+  },
+  heroOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+    padding: 20,
+    paddingBottom: 16,
+  },
+  heroNameImage: {
+    fontFamily: fonts.manropeBold,
+    fontSize: 24,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginBottom: 4,
+  },
+  heroLocationImage: {
+    fontFamily: fonts.interRegular,
+    fontSize: 13,
+    color: '#FFFFFF',
+    opacity: 0.9,
     flexShrink: 1,
   },
 

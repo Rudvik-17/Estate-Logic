@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -152,7 +153,7 @@ export default function OwnerDashboard({ navigation }) {
   if (properties.length === 0) {
     return (
       <View style={styles.container}>
-        <ScreenHeader showBell />
+        <ScreenHeader showProfile={true} />
         <ScrollView
           contentContainerStyle={styles.emptyScrollContent}
           showsVerticalScrollIndicator={false}
@@ -182,7 +183,7 @@ export default function OwnerDashboard({ navigation }) {
   // ── Dashboard with data ───────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      <ScreenHeader showBell />
+      <ScreenHeader showProfile={true} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -259,9 +260,13 @@ export default function OwnerDashboard({ navigation }) {
                 activeOpacity={0.8}
               >
                 <View style={styles.propertyCardInner}>
-                  <View style={styles.propertyIconBg}>
-                    <MaterialIcons name="apartment" size={28} color={colors.onPrimary} />
-                  </View>
+                  {property.image_url ? (
+                    <Image source={{ uri: property.image_url }} style={styles.propertyThumbnail} />
+                  ) : (
+                    <View style={styles.propertyIconBg}>
+                      <MaterialIcons name="apartment" size={28} color={colors.onPrimary} />
+                    </View>
+                  )}
                   <View style={styles.propertyInfo}>
                     <Text style={styles.propertyName}>{property.name}</Text>
                     <View style={styles.propertyMeta}>
@@ -400,6 +405,12 @@ const getStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  propertyThumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    resizeMode: 'cover',
   },
   propertyInfo: { flex: 1 },
   propertyName: {

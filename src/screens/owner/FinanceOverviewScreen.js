@@ -148,7 +148,7 @@ export default function FinanceOverviewScreen({ navigation }) {
   if (properties.length === 0 && payments.length === 0 && transactions.length === 0) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Finance" showBell />
+        <ScreenHeader title="Finance" showProfile={true} />
         <View style={styles.centered}>
           <MaterialIcons name="account-balance-wallet" size={48} color={colors.outline} />
           <Text style={styles.emptyTitle}>No financial data yet</Text>
@@ -164,7 +164,7 @@ export default function FinanceOverviewScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Finance" showBell />
+      <ScreenHeader title="Finance" showProfile={true} />
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}

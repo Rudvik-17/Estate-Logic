@@ -289,7 +289,7 @@ export default function ResidentIssuesScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Issues" showBell />
+      <ScreenHeader title="Issues" showProfile={true} />
 
       <FlatList
         data={filtered}

@@ -9,8 +9,11 @@ import {
   Platform,
   StyleSheet,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +57,59 @@ export default function AddPropertyScreen({ navigation }) {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [propertyImage, setPropertyImage] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handlePickPropertyImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please grant library permissions to upload a photo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      const selectedUri = result.assets[0].uri;
+      setUploadingImage(true);
+
+      const response = await fetch(selectedUri);
+      const blob = await response.blob();
+      const fileExt = selectedUri.split('.').pop() || 'jpg';
+      const fileName = `${user.id}-property-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('properties')
+        .upload(fileName, blob, {
+          contentType: blob.type || 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('properties')
+        .getPublicUrl(fileName);
+
+      setPropertyImage(publicUrl);
+    } catch (err) {
+      console.error('Property image upload error:', err);
+      Alert.alert('Error', 'Failed to upload photo: ' + err.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemovePropertyImage = () => {
+    setPropertyImage(null);
+  };
 
   // Step 1 — property type
   const [propertyType, setPropertyType] = useState('apartment');
@@ -197,6 +253,7 @@ export default function AddPropertyScreen({ navigation }) {
         total_units: Number(totalUnits),
         avg_rent: propertyType === 'commercial' ? Number(commArea) * Number(commRate) : Number(avgRent),
         property_type: propertyType,
+        image_url: propertyImage,
       })
       .select('id')
       .single();
@@ -368,6 +425,34 @@ export default function AddPropertyScreen({ navigation }) {
           ))}
         </View>
       ) : null}
+
+      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>PROPERTY PHOTO</Text>
+      <TouchableOpacity
+        style={styles.photoUploadContainer}
+        onPress={handlePickPropertyImage}
+        disabled={uploadingImage}
+        activeOpacity={0.8}
+      >
+        {propertyImage ? (
+          <View style={styles.photoContainer}>
+            <Image source={{ uri: propertyImage }} style={styles.photoImage} />
+            <TouchableOpacity style={styles.removePhotoBadge} onPress={handleRemovePropertyImage}>
+              <MaterialIcons name="close" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            {uploadingImage ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <MaterialIcons name="add-a-photo" size={24} color={colors.outline} />
+                <Text style={styles.photoPlaceholderText}>Add a photo of your property</Text>
+              </>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
     </View>
   );
 
@@ -531,6 +616,10 @@ export default function AddPropertyScreen({ navigation }) {
         </View>
 
         <View style={styles.reviewDivider} />
+
+        {propertyImage && (
+          <Image source={{ uri: propertyImage }} style={styles.reviewPropertyImage} />
+        )}
 
         {propertyType === 'commercial' ? (
           <>
@@ -941,4 +1030,54 @@ const getStyles = (colors) => StyleSheet.create({
   },
   footerSpacer: { flex: 0, width: 60 },
   nextBtnWrapper: { flex: 1 },
+
+  // ── Photo upload styles ──────────────────────────────────────────────────────────
+  photoUploadContainer: {
+    marginTop: 8,
+    backgroundColor: colors.surfaceContainerHighest,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    borderStyle: 'dashed',
+    height: 150,
+    overflow: 'hidden',
+  },
+  photoContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  removePhotoBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  photoPlaceholderText: {
+    fontFamily: fonts.interMedium,
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+  },
+  reviewPropertyImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 16,
+    resizeMode: 'cover',
+  },
 });

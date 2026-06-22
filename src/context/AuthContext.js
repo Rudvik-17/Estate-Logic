@@ -6,6 +6,7 @@ const AuthContext = createContext({});
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,7 +16,7 @@ export const AuthProvider = ({ children }) => {
         setUser(session.user);
         const handleInitialSession = async () => {
           await linkTenantIfNeeded(session.user);
-          await fetchRole(session.user.id);
+          await fetchProfile(session.user.id);
         };
         handleInitialSession();
       } else {
@@ -33,13 +34,14 @@ export const AuthProvider = ({ children }) => {
           if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
             await linkTenantIfNeeded(session.user);
           }
-          await fetchRole(session.user.id);
+          await fetchProfile(session.user.id);
         };
         
         handleAuthSession();
       } else {
         setUser(null);
         setRole(null);
+        setProfile(null);
         setLoading(false);
       }
     });
@@ -77,30 +79,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const fetchRole = async (userId) => {
+  const fetchProfile = async (userId) => {
     setLoading(true);
-    const { data } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-    setRole(data?.role ?? null);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role, full_name, avatar_url, age, gender, phone, email')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      setRole(data?.role ?? null);
+      setProfile(data ?? null);
+    } catch (err) {
+      console.error('Error fetching profile:', err.message);
+      setRole(null);
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Exposed so screens can force a role re-fetch after updating the users table
-  // without relying on an auth state change event firing.
-  const refetchRole = async () => {
+  // Exposed so screens can force a role/profile re-fetch after updating the users table
+  const refetchProfile = async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser) await fetchRole(currentUser.id);
+    if (currentUser) await fetchProfile(currentUser.id);
   };
 
   // Sets role to null in memory so RootNavigator shows RoleSelectionScreen.
   // Does not touch the database — RoleSelectionScreen will upsert the new choice.
-  const clearRole = () => setRole(null);
+  const clearRole = () => {
+    setRole(null);
+    setProfile(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, refetchRole, clearRole }}>
+    <AuthContext.Provider value={{ user, role, profile, loading, refetchRole: refetchProfile, refetchProfile, clearRole }}>
       {children}
     </AuthContext.Provider>
   );

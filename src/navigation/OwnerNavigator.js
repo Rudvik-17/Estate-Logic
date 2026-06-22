@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View, StyleSheet, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -120,14 +120,26 @@ export default function OwnerNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: tabBarStyle,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.outline,
-        tabBarLabelStyle: {
-          fontFamily: fonts.interMedium,
-          fontSize: 10,
-          letterSpacing: -0.2,
+        tabBarLabel: ({ focused }) => {
+          const textColor = focused ? colors.primary : colors.outline;
+          return (
+            <Text 
+              numberOfLines={1}
+              adjustsFontSizeToFit={true}
+              minimumScaleFactor={0.8}
+              style={{
+                fontFamily: fonts.interMedium,
+                fontSize: 10,
+                letterSpacing: -0.3,
+                color: textColor,
+                marginTop: -2,
+              }}
+            >
+              {route.name}
+            </Text>
+          );
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ size, focused }) => {
           const icons = {
             Portfolio: 'domain',
             Residents: 'groups',
@@ -136,7 +148,21 @@ export default function OwnerNavigator() {
             Community: 'business',
             Menu: 'menu',
           };
-          return <MaterialIcons name={icons[route.name]} size={size} color={color} />;
+          const iconColor = focused ? colors.primary : colors.outline;
+          return (
+            <View style={[
+              styles.iconWrapper,
+              focused && {
+                shadowColor: colors.primary,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5,
+                shadowRadius: 6,
+                elevation: 3,
+              }
+            ]}>
+              <MaterialIcons name={icons[route.name]} size={focused ? size + 1 : size} color={iconColor} />
+            </View>
+          );
         },
       })}
     >
@@ -149,4 +175,14 @@ export default function OwnerNavigator() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 2,
+    width: 44,
+    height: 38,
+  },
+});
 

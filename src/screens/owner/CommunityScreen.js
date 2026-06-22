@@ -51,6 +51,7 @@ export default function CommunityScreen({ navigation }) {
       <ScreenHeader
         title="Community Portal"
         showBack={false}
+        showProfile={true}
       />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}

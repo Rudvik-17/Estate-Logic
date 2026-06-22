@@ -130,7 +130,7 @@ export default function ResidentDataScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Residents" showBell />
+      <ScreenHeader title="Residents" showProfile={true} />
 
       <FlatList
         data={filtered}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,33 +19,8 @@ import { RateLimitedButton } from '../../components/RateLimitedButton';
 
 export default function MenuScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, clearRole } = useAuth();
-
-  const [loading, setLoading] = useState(true);
-  const [ownerName, setOwnerName] = useState('');
+  const { user, profile, clearRole } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
-
-  useEffect(() => {
-    async function loadOwnerName() {
-      if (!user) return;
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('full_name')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-        setOwnerName(data?.full_name || 'Property Owner');
-      } catch (err) {
-        console.error('Error loading owner name:', err.message);
-        setOwnerName('Property Owner');
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadOwnerName();
-  }, [user?.id]);
 
   const handleSettings = () => {
     Alert.alert(
@@ -93,15 +68,25 @@ export default function MenuScreen({ navigation }) {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  const getInitials = () => {
+    if (profile?.full_name) {
+      return profile.full_name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(n => n[0].toUpperCase())
+        .join('');
+    }
+    return user?.email?.substring(0, 2).toUpperCase() || '?';
+  };
 
   const menuItems = [
+    {
+      id: 'edit_profile',
+      label: 'Edit Profile',
+      icon: 'person',
+      action: () => navigation.navigate('EditProfile'),
+    },
     {
       id: 'settings',
       label: 'App Settings',
@@ -139,12 +124,31 @@ export default function MenuScreen({ navigation }) {
         contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <Text style={styles.ownerName}>{ownerName}</Text>
-          <Text style={styles.ownerEmail}>{user?.email || 'owner@estatelogic.com'}</Text>
+        {/* Profile Header - Interactive */}
+        <TouchableOpacity
+          style={styles.profileHeader}
+          onPress={() => navigation.navigate('EditProfile')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.profileCardContent}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarPlaceholderText}>{getInitials()}</Text>
+              </View>
+            )}
+            <View style={styles.profileInfoText}>
+              <Text style={styles.ownerName}>{profile?.full_name || 'Property Owner'}</Text>
+              <Text style={styles.ownerEmail}>{user?.email || 'owner@estatelogic.com'}</Text>
+              {profile?.phone ? (
+                <Text style={styles.ownerPhone}>{profile.phone}</Text>
+              ) : null}
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={colors.outline} />
+          </View>
           <View style={styles.divider} />
-        </View>
+        </TouchableOpacity>
 
         {/* Menu Items List */}
         <View style={styles.menuList}>
@@ -197,12 +201,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-  },
   scroll: {
     flex: 1,
   },
@@ -212,7 +210,37 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     paddingVertical: 12,
-    gap: 4,
+  },
+  profileCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  avatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  avatarPlaceholderText: {
+    fontFamily: fonts.manropeBold,
+    fontSize: 20,
+    color: colors.onPrimaryContainer,
+  },
+  profileInfoText: {
+    flex: 1,
+    gap: 2,
   },
   ownerName: {
     fontFamily: fonts.manropeBold,
@@ -223,6 +251,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.interRegular,
     fontSize: 14,
     color: colors.onSurfaceVariant,
+  },
+  ownerPhone: {
+    fontFamily: fonts.interRegular,
+    fontSize: 12,
+    color: colors.outline,
+    marginTop: 2,
   },
   divider: {
     height: 1,
@@ -246,6 +280,7 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flex: 1,
+    minHeight: 40,
   },
   bottomSection: {
     marginTop: 24,
