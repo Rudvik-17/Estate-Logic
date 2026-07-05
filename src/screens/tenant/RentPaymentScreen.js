@@ -107,6 +107,33 @@ function generateRazorpayHtml(keyId, amount, email, name, phone, orderId) {
                 "description": "Rent Payment",
                 "order_id": "${orderId || ''}",
                 "prefill": {},
+                "method": {
+                  "card": true,
+                  "upi": true,
+                  "netbanking": true,
+                  "wallet": true,
+                  "emi": false,
+                  "cardless_emi": false
+                },
+                "config": {
+                  "display": {
+                    "blocks": {
+                      "banks": {
+                        "name": "Pay via UPI / Cards / Netbanking",
+                        "instruments": [
+                          { "method": "upi" },
+                          { "method": "card" },
+                          { "method": "netbanking" },
+                          { "method": "wallet" }
+                        ]
+                      }
+                    },
+                    "sequence": ["block.banks"],
+                    "preferences": {
+                      "show_default_blocks": true
+                    }
+                  }
+                },
                 "theme": {
                   "color": "#3399cc"
                 },
@@ -138,10 +165,18 @@ function generateRazorpayHtml(keyId, amount, email, name, phone, orderId) {
               const rzp = new Razorpay(options);
               
               rzp.on('payment.failed', function (response) {
-                console.error('Razorpay Payment Failed details: ' + JSON.stringify(response.error));
+                var err = response.error || {};
+                console.error('Razorpay Payment Failed: code=' + err.code + ' desc=' + err.description + ' source=' + err.source + ' step=' + err.step + ' reason=' + err.reason);
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   status: 'failed',
-                  error: response.error
+                  error: {
+                    code: err.code || 'UNKNOWN',
+                    description: err.description || 'Payment failed',
+                    source: err.source || '',
+                    step: err.step || '',
+                    reason: err.reason || '',
+                    metadata: err.metadata || {}
+                  }
                 }));
               });
               
@@ -1056,9 +1091,18 @@ export default function RentPaymentScreen({ navigation }) {
             <View style={{ width: 24 }} />
           </View>
           
+          {(process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || '').startsWith('rzp_test_') && (
+            <View style={{ backgroundColor: '#FFF3CD', paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="info" size={16} color="#856404" />
+              <Text style={{ fontFamily: fonts.interMedium, fontSize: 12, color: '#856404', flex: 1 }}>
+                Test Mode — Card: 5267 3181 8797 5449 | UPI: success@razorpay
+              </Text>
+            </View>
+          )}
+
           <WebView
             originWhitelist={['*']}
-            source={{ html: razorpayHtml, baseUrl: 'https://olswwdunaivwxefelasc.supabase.co' }}
+            source={{ html: razorpayHtml, baseUrl: 'https://api.razorpay.com' }}
             onMessage={(event) => {
               try {
                 const data = JSON.parse(event.nativeEvent.data);
@@ -1079,7 +1123,15 @@ export default function RentPaymentScreen({ navigation }) {
                 } else if (data.status === 'failed') {
                   setShowRealRazorpay(false);
                   setPaying(false);
-                  Alert.alert('Payment Failed', data.error?.description || 'The payment transaction failed.');
+                  const errInfo = data.error || {};
+                  const isTestMode = (process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || '').startsWith('rzp_test_');
+                  let errMsg = errInfo.description || 'The payment transaction failed.';
+                  if (errInfo.reason) errMsg += `\n\nReason: ${errInfo.reason}`;
+                  if (errInfo.step) errMsg += `\nStep: ${errInfo.step}`;
+                  if (isTestMode) {
+                    errMsg += '\n\n━━ Test Mode ━━\nReal cards/UPI won\'t work with test keys.\n\nUse these test credentials:\n• Card: 4111 1111 1111 1111\n  Expiry: any future date, CVV: any 3 digits\n• UPI: success@razorpay\n• Netbanking: select any bank → auto-succeeds';
+                  }
+                  Alert.alert('Payment Failed', errMsg);
                 } else if (data.status === 'error') {
                   setShowRealRazorpay(false);
                   setPaying(false);
